@@ -57,6 +57,16 @@ const LABEL_MAP: Record<string, keyof HtmlFields> = {
 };
 
 /**
+ * Parse a DD/MM/YYYY date string into ISO format (YYYY-MM-DD).
+ */
+function parseDateDMY(value: string): string | null {
+  const match = value.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!match) return null;
+  const [, day, month, year] = match;
+  return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+}
+
+/**
  * Parse a label/value pair and set the corresponding field.
  */
 function applyField(fields: HtmlFields, label: string, value: string): void {
@@ -91,9 +101,11 @@ function applyField(fields: HtmlFields, label: string, value: string): void {
     case 'totalSqm':
       fields[fieldName] = parseArea(value);
       break;
+    case 'publishedAt':
+      fields[fieldName] = parseDateDMY(value);
+      break;
     case 'floorType':
     case 'titleStatus':
-    case 'publishedAt':
     case 'location':
     case 'address':
       fields[fieldName] = value;

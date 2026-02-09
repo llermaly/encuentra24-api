@@ -70,5 +70,8 @@ export function buildListUrl(cat: CategoryConfig, regionSlug?: string, page?: nu
     url += `.${page}`;
   }
 
+  // Sort by recency so incremental crawls find new listings first
+  url += '?sort=f_added&dir=desc';
+
   return url;
 }

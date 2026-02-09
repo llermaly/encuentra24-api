@@ -146,7 +146,15 @@ router.addHandler('LIST', async ({ $, request, enqueueLinks, crawler }) => {
 
   // Enqueue next page if within limits
   const pagination = extractPagination($);
-  const maxPage = Math.max(...pagination, currentPage);
+  let maxPage = Math.max(...pagination, currentPage);
+
+  // Use results count as fallback for total pages (guards against truncated pagination UI)
+  const resultsCount = extractResultsCount($);
+  if (resultsCount !== null && resultsCount > 0) {
+    const totalPages = Math.ceil(resultsCount / 30);
+    maxPage = Math.max(maxPage, totalPages);
+  }
+
   const nextPage = currentPage + 1;
 
   if (nextPage <= maxPage && nextPage <= maxPages) {

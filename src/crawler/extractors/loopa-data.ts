@@ -1,4 +1,5 @@
 import type { CheerioAPI } from 'cheerio';
+import { safeParseFloat } from '../utils/price.js';
 
 export interface LoopaData {
   productId: string | null;
@@ -37,12 +38,12 @@ export function extractLoopaData($: CheerioAPI): LoopaData | null {
 
     return {
       productId: data.ProductId || null,
-      price: typeof data.Price === 'number' ? data.Price : parseFloat(data.Price) || null,
+      price: safeParseFloat(data.Price),
       country: data.Country || null,
       region: data.Region || null,
       parentRegion: data.ParentRegion || null,
       bedrooms: data.Bedrooms ? parseInt(data.Bedrooms, 10) : null,
-      size: data.Size ? parseFloat(data.Size) : null,
+      size: safeParseFloat(data.Size),
       housingType: data.HousingType || null,
       saleType: data.SaleType || null,
       raw,

@@ -1,4 +1,5 @@
 import type { CheerioAPI } from 'cheerio';
+import { safeParseFloat } from '../utils/price.js';
 
 export interface JsonLdData {
   name: string | null;
@@ -50,7 +51,7 @@ export function extractJsonLd($: CheerioAPI): JsonLdData | null {
     return {
       name: data.name || null,
       description: data.description || null,
-      price: typeof offers.price === 'number' ? offers.price : parseFloat(offers.price) || null,
+      price: safeParseFloat(offers.price),
       currency: offers.priceCurrency || null,
       availability: offers.availability || null,
       imageUrl: image.contentUrl || null,

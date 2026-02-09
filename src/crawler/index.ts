@@ -1,5 +1,6 @@
-import { CheerioCrawler, log, LogLevel } from 'crawlee';
+import { CheerioCrawler, Configuration, log, LogLevel } from 'crawlee';
 import { eq } from 'drizzle-orm';
+import { rmSync } from 'node:fs';
 import { router } from './router.js';
 import { findCategory, buildListUrl, type CategoryConfig } from './categories.js';
 import { config } from '../config.js';
@@ -22,6 +23,7 @@ export interface CrawlOptions {
 function createCrawler() {
   return new CheerioCrawler({
     requestHandler: router,
+    minConcurrency: config.crawler.maxConcurrency,
     maxConcurrency: config.crawler.maxConcurrency,
     maxRequestsPerMinute: config.crawler.maxRequestsPerMinute,
     maxRequestRetries: config.crawler.maxRequestRetries,
@@ -29,9 +31,8 @@ function createCrawler() {
     navigationTimeoutSecs: 30,
     useSessionPool: true,
     sessionPoolOptions: {
-      maxPoolSize: 10,
+      maxPoolSize: config.crawler.maxConcurrency,
     },
-    // Respectful delay between requests to same domain
     sameDomainDelaySecs: config.crawler.sameDomainDelaySecs,
     failedRequestHandler: async ({ request }, error) => {
       const db = getDb();
@@ -85,6 +86,16 @@ export async function runCrawl(options: CrawlOptions): Promise<void> {
   // Set log level
   log.setLevel(logLevel === 'debug' ? LogLevel.DEBUG : LogLevel.INFO);
 
+  // Clean up stale storage from previous crashed runs
+  try {
+    rmSync('./storage', { recursive: true, force: true });
+  } catch {
+    // ignore if doesn't exist
+  }
+
+  // Disable persistent storage — our data lives in SQLite, no need for file-based request queues
+  Configuration.getGlobalConfig().set('persistStorage', false);
+
   const db = getDb();
   const startedAt = new Date().toISOString();
 
@@ -101,7 +112,7 @@ export async function runCrawl(options: CrawlOptions): Promise<void> {
   log.info(`Crawl run #${crawlRunId} started`);
 
   const crawler = createCrawler();
-  const effectiveMaxPages = full ? 500 : maxPages;
+  const effectiveMaxPages = full ? 9999 : maxPages;
 
   try {
     if (detailOnly) {
@@ -152,6 +163,8 @@ export async function runCrawl(options: CrawlOptions): Promise<void> {
 
     log.info(`Crawl run #${crawlRunId} completed in ${durationSecs}s`, stats);
   } catch (error) {
+    const errMsg = (error as Error).message || String(error);
+    log.error(`Crawl run #${crawlRunId} failed: ${errMsg}`);
     await db.update(crawlRuns)
       .set({
         finishedAt: new Date().toISOString(),

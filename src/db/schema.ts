@@ -51,6 +51,7 @@ export const listings = sqliteTable('listings', {
   hasVr: integer('has_vr', { mode: 'boolean' }),
 
   // Seller / Agent
+  sellerId: integer('seller_id'),
   sellerName: text('seller_name'),
   sellerType: text('seller_type'),
   sellerVerified: integer('seller_verified', { mode: 'boolean' }),
@@ -123,6 +124,23 @@ export const crawlRuns = sqliteTable('crawl_runs', {
   errors: integer().default(0),
   durationSecs: integer('duration_secs'),
 });
+
+export const sellers = sqliteTable('sellers', {
+  id: integer().primaryKey({ autoIncrement: true }),
+  name: text().notNull().unique(),
+  type: text(), // 'agent' | 'owner'
+  verified: integer({ mode: 'boolean' }).default(false),
+  whatsapp: text(),
+  phone: text(),
+  profileUrl: text('profile_url'),
+  listingCount: integer('listing_count').default(0),
+  sampleListingUrl: text('sample_listing_url'),
+  firstSeenAt: text('first_seen_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+}, (table) => [
+  index('idx_seller_name').on(table.name),
+  index('idx_seller_whatsapp').on(table.whatsapp),
+]);
 
 export const crawlErrors = sqliteTable('crawl_errors', {
   id: integer().primaryKey({ autoIncrement: true }),

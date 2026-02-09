@@ -1,10 +1,23 @@
+import 'dotenv/config';
 import { defineConfig } from 'drizzle-kit';
+
+const tursoUrl = process.env.TURSO_DATABASE_URL;
 
 export default defineConfig({
   schema: './src/db/schema.ts',
   out: './drizzle',
-  dialect: 'sqlite',
-  dbCredentials: {
-    url: process.env.DATABASE_PATH || './data/encuentra24.db',
-  },
+  ...(tursoUrl
+    ? {
+        dialect: 'turso',
+        dbCredentials: {
+          url: tursoUrl,
+          authToken: process.env.TURSO_AUTH_TOKEN,
+        },
+      }
+    : {
+        dialect: 'sqlite',
+        dbCredentials: {
+          url: process.env.DATABASE_PATH || './data/encuentra24.db',
+        },
+      }),
 });

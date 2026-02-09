@@ -4,6 +4,7 @@ import { Command } from 'commander';
 import { crawlCommand } from './cli/commands/crawl.js';
 import { statusCommand } from './cli/commands/status.js';
 import { exportCommand } from './cli/commands/export.js';
+import { sellersCommand } from './cli/commands/sellers.js';
 
 const program = new Command();
 
@@ -15,5 +16,6 @@ program
 program.addCommand(crawlCommand);
 program.addCommand(statusCommand);
 program.addCommand(exportCommand);
+program.addCommand(sellersCommand);
 
 program.parse();

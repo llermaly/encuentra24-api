@@ -54,6 +54,21 @@ export function parseFloatSafe(raw: string | null | undefined): number | null {
 }
 
 /**
+ * Safe parseFloat wrapper: returns null for NaN, Infinity, -Infinity.
+ * Use in extractors that parse raw JSON values (JSON-LD, loopaData, RetailRocket).
+ */
+export function safeParseFloat(value: unknown): number | null {
+  if (typeof value === 'number') {
+    return isFinite(value) ? value : null;
+  }
+  if (typeof value === 'string') {
+    const num = parseFloat(value);
+    return isFinite(num) ? num : null;
+  }
+  return null;
+}
+
+/**
  * Parse discount percentage from badge text like "-3%" or "-14%".
  */
 export function parseDiscount(raw: string | null | undefined): number | null {

@@ -15,6 +15,13 @@
       "when": 1770528235791,
       "tag": "0001_natural_red_ghost",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1770612649673,
+      "tag": "0002_furry_tyger_tiger",
+      "breakpoints": true
     }
   ]
 }

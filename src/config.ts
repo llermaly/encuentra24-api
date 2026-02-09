@@ -5,6 +5,8 @@ export const BASE_URL = 'https://www.encuentra24.com/panama-es';
 export const config = {
   database: {
     path: process.env.DATABASE_PATH || './data/encuentra24.db',
+    tursoUrl: process.env.TURSO_DATABASE_URL,
+    tursoAuthToken: process.env.TURSO_AUTH_TOKEN,
   },
   crawler: {
     maxConcurrency: Number(process.env.MAX_CONCURRENCY) || 3,

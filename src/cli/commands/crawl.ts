@@ -15,7 +15,7 @@ export const crawlCommand = new Command('crawl')
     console.log(`  Category: ${opts.category || 'all'}`);
     console.log(`  Subcategory: ${opts.subcategory || 'all'}`);
     console.log(`  Region: ${opts.region || 'all'}`);
-    console.log(`  Max pages: ${opts.full ? '500 (full)' : opts.maxPages}`);
+    console.log(`  Max pages: ${opts.full ? 'unlimited (full)' : opts.maxPages}`);
     console.log(`  Detail only: ${opts.detailOnly}`);
     console.log('');
 

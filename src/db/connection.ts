@@ -8,11 +8,21 @@ import { dirname } from 'node:path';
 let db: ReturnType<typeof createDb> | null = null;
 
 function createDb() {
-  mkdirSync(dirname(config.database.path), { recursive: true });
+  const { tursoUrl, tursoAuthToken, path } = config.database;
 
-  const client = createClient({
-    url: `file:${config.database.path}`,
-  });
+  let client;
+  if (tursoUrl) {
+    console.log('Connecting to Turso:', tursoUrl);
+    client = createClient({
+      url: tursoUrl,
+      authToken: tursoAuthToken,
+    });
+  } else {
+    mkdirSync(dirname(path), { recursive: true });
+    client = createClient({
+      url: `file:${path}`,
+    });
+  }
 
   return drizzle(client, { schema });
 }

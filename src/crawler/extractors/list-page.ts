@@ -159,8 +159,8 @@ export function extractPagination($: CheerioAPI): number[] {
  */
 export function extractResultsCount($: CheerioAPI): number | null {
   const text = $('.d3-category-list__results').text();
-  const match = text.match(/(\d+)/);
-  return match ? parseInt(match[1], 10) : null;
+  const match = text.match(/([\d,]+)/);
+  return match ? parseInt(match[1].replace(/,/g, ''), 10) : null;
 }
 
 /**

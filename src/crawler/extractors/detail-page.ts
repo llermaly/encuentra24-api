@@ -1,4 +1,5 @@
 import type { CheerioAPI } from 'cheerio';
+import { safeParseFloat } from '../utils/price.js';
 import { extractJsonLd } from './json-ld.js';
 import { extractLoopaData } from './loopa-data.js';
 import {
@@ -85,7 +86,7 @@ function extractRetailRocket($: CheerioAPI): { oldPrice: number | null; category
       try {
         const data = JSON.parse(raw);
         if (data.oldPrice) {
-          oldPrice = typeof data.oldPrice === 'number' ? data.oldPrice : parseFloat(data.oldPrice);
+          oldPrice = safeParseFloat(data.oldPrice);
         }
         if (data.categoryPaths && data.categoryPaths[0]) {
           categoryPaths = data.categoryPaths[0];
