@@ -69,13 +69,13 @@ export function ListingFilters({ searchParams, onUpdate }: ListingFiltersProps) 
           onChange={v => onUpdate({ location: v || undefined })}
         />
         <SelectFilter
-          label="Category"
+          label="Categories"
           value={searchParams.get('category') || ''}
           options={CATEGORY_OPTIONS as unknown as Array<{ value: string; label: string }>}
           onChange={v => onUpdate({ category: v || undefined })}
         />
         <SelectFilter
-          label="Type"
+          label="Types"
           value={searchParams.get('subcategory') || ''}
           options={SUBCATEGORY_OPTIONS as unknown as Array<{ value: string; label: string }>}
           onChange={v => onUpdate({ subcategory: v || undefined })}
@@ -271,7 +271,7 @@ function SelectFilter({
         onChange={e => onChange(e.target.value)}
         className="px-3 py-1.5 text-sm border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
       >
-        <option value="">All {label}s</option>
+        <option value="">All {label}</option>
         {options.map(opt => (
           <option key={opt.value} value={opt.value}>{opt.label}</option>
         ))}

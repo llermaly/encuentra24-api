@@ -45,6 +45,7 @@ export const SORT_OPTIONS = [
   { value: 'price_asc', label: 'Price: Low to High' },
   { value: 'price_desc', label: 'Price: High to Low' },
   { value: 'area_desc', label: 'Largest Area' },
+  { value: 'favorites_desc', label: 'Most Popular' },
 ] as const;
 
 export const CATEGORY_OPTIONS = [

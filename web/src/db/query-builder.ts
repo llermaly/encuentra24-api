@@ -51,6 +51,7 @@ export function buildListingOrderBy(sort?: string) {
     case 'price_asc': return asc(listings.price);
     case 'price_desc': return desc(listings.price);
     case 'area_desc': return desc(listings.builtAreaSqm);
+    case 'favorites_desc': return desc(listings.favoritesCount);
     case 'date_desc': return desc(listings.lastSeenAt);
     case 'first_seen_desc': return desc(listings.firstSeenAt);
     case 'published_desc':

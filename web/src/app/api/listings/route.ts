@@ -38,6 +38,7 @@ export async function GET(request: NextRequest) {
       sellerName: listings.sellerName,
       sellerType: listings.sellerType,
       featureLevel: listings.featureLevel,
+      favoritesCount: listings.favoritesCount,
       publishedAt: listings.publishedAt,
       firstSeenAt: listings.firstSeenAt,
       lastSeenAt: listings.lastSeenAt,

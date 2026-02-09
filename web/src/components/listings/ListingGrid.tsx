@@ -25,6 +25,7 @@ interface ListingGridProps {
     publishedAt: string | null;
     sellerName: string | null;
     featureLevel: string | null;
+    favoritesCount: number | null;
   }>;
   isLoading: boolean;
 }
