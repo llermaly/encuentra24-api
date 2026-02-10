@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
-import { Sidebar } from '@/components/layout/Sidebar';
+import { StackProvider, StackTheme } from '@stackframe/stack';
+import { stackServerApp } from '@/stack';
 import { Providers } from './providers';
 import './globals.css';
 
@@ -29,14 +30,13 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <Providers>
-          <div className="flex h-screen overflow-hidden">
-            <Sidebar />
-            <main className="flex-1 overflow-auto bg-gray-50">
+        <StackProvider app={stackServerApp}>
+          <StackTheme>
+            <Providers>
               {children}
-            </main>
-          </div>
-        </Providers>
+            </Providers>
+          </StackTheme>
+        </StackProvider>
       </body>
     </html>
   );

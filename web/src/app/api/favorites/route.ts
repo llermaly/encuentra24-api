@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { favorites, listings } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
+import { requireUser } from '@/lib/auth';
 
 export async function GET() {
+  const user = await requireUser();
+
   const rows = await db
     .select({
       adId: favorites.adId,
@@ -19,7 +22,8 @@ export async function GET() {
       url: listings.url,
     })
     .from(favorites)
-    .leftJoin(listings, eq(favorites.adId, listings.adId));
+    .leftJoin(listings, eq(favorites.adId, listings.adId))
+    .where(eq(favorites.userId, user.id));
 
   return NextResponse.json(rows.map(r => ({
     ...r,
@@ -29,9 +33,11 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const user = await requireUser();
   const { adId } = await request.json();
 
   const result = await db.insert(favorites).values({
+    userId: user.id,
     adId,
     createdAt: new Date().toISOString(),
   }).onConflictDoNothing().returning();

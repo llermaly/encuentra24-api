@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useUser } from '@stackframe/stack';
 import { PIPELINE_STAGES, PIPELINE_STAGE_LABELS } from '@/lib/constants';
 import { formatPrice } from '@/lib/formatters';
 import Link from 'next/link';
@@ -106,6 +107,7 @@ function KanbanColumn({ stage, items }: { stage: string; items: PipelineItem[] }
 }
 
 export default function PipelinePage() {
+  useUser({ or: 'redirect' });
   const queryClient = useQueryClient();
   const [activeItem, setActiveItem] = useState<PipelineItem | null>(null);
 

@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
 import { listings, priceHistory, pipelineItems, crawlRuns, favorites } from '@/db/schema';
-import { sql, desc, gte, eq } from 'drizzle-orm';
+import { sql, desc, gte, eq, and } from 'drizzle-orm';
+import { requireUser } from '@/lib/auth';
 
 export async function GET() {
+  const user = await requireUser();
+
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
   const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -12,7 +15,7 @@ export async function GET() {
     db.select({ count: sql<number>`count(*)` }).from(listings),
     db.select({ count: sql<number>`count(*)` }).from(listings).where(gte(listings.firstSeenAt, todayStart)),
     db.select({ count: sql<number>`count(*)` }).from(listings).where(gte(listings.firstSeenAt, weekAgo)),
-    db.select({ count: sql<number>`count(*)` }).from(favorites),
+    db.select({ count: sql<number>`count(*)` }).from(favorites).where(eq(favorites.userId, user.id)),
   ]);
 
   const priceDrops = await db
@@ -37,6 +40,7 @@ export async function GET() {
       count: sql<number>`count(*)`,
     })
     .from(pipelineItems)
+    .where(eq(pipelineItems.userId, user.id))
     .groupBy(pipelineItems.stage);
 
   const lastCrawl = await db

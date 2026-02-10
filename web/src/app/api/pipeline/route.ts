@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { pipelineItems, listings } from '@/db/schema';
 import { eq } from 'drizzle-orm';
+import { requireUser } from '@/lib/auth';
 
 export async function GET() {
+  const user = await requireUser();
+
   const rows = await db
     .select({
       adId: pipelineItems.adId,
@@ -22,7 +25,8 @@ export async function GET() {
       url: listings.url,
     })
     .from(pipelineItems)
-    .leftJoin(listings, eq(pipelineItems.adId, listings.adId));
+    .leftJoin(listings, eq(pipelineItems.adId, listings.adId))
+    .where(eq(pipelineItems.userId, user.id));
 
   return NextResponse.json(rows.map(r => ({
     ...r,
@@ -32,10 +36,12 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const user = await requireUser();
   const { adId, stage = 'discovered' } = await request.json();
   const now = new Date().toISOString();
 
   const result = await db.insert(pipelineItems).values({
+    userId: user.id,
     adId,
     stage,
     position: 0,

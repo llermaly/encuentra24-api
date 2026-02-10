@@ -3,9 +3,11 @@ import { db } from '@/db';
 import { listings, favorites, pipelineItems } from '@/db/schema';
 import { buildListingWhere, buildListingOrderBy, getPagination } from '@/db/query-builder';
 import { parseFiltersFromParams } from '@/types/filters';
-import { sql, eq } from 'drizzle-orm';
+import { sql, eq, and } from 'drizzle-orm';
+import { requireUser } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
+  const user = await requireUser();
   const filters = parseFiltersFromParams(request.nextUrl.searchParams);
   const { limit, offset, page } = getPagination(filters);
 
@@ -36,6 +38,7 @@ export async function GET(request: NextRequest) {
       imageCount: listings.imageCount,
       images: listings.images,
       sellerName: listings.sellerName,
+      agentName: listings.agentName,
       sellerType: listings.sellerType,
       featureLevel: listings.featureLevel,
       favoritesCount: listings.favoritesCount,
@@ -46,8 +49,8 @@ export async function GET(request: NextRequest) {
       pipelineStage: pipelineItems.stage,
     })
     .from(listings)
-    .leftJoin(favorites, eq(listings.adId, favorites.adId))
-    .leftJoin(pipelineItems, eq(listings.adId, pipelineItems.adId))
+    .leftJoin(favorites, and(eq(listings.adId, favorites.adId), eq(favorites.userId, user.id)))
+    .leftJoin(pipelineItems, and(eq(listings.adId, pipelineItems.adId), eq(pipelineItems.userId, user.id)))
     .where(where)
     .orderBy(orderBy)
     .limit(limit)
@@ -56,8 +59,8 @@ export async function GET(request: NextRequest) {
   const countResult = await db
     .select({ count: sql<number>`count(*)` })
     .from(listings)
-    .leftJoin(favorites, eq(listings.adId, favorites.adId))
-    .leftJoin(pipelineItems, eq(listings.adId, pipelineItems.adId))
+    .leftJoin(favorites, and(eq(listings.adId, favorites.adId), eq(favorites.userId, user.id)))
+    .leftJoin(pipelineItems, and(eq(listings.adId, pipelineItems.adId), eq(pipelineItems.userId, user.id)))
     .where(where);
 
   const total = countResult[0].count;

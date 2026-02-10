@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useUser } from '@stackframe/stack';
 import { formatRelativeDate } from '@/lib/formatters';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -16,6 +17,7 @@ interface SavedSearch {
 }
 
 export default function SavedSearchesPage() {
+  useUser({ or: 'redirect' });
   const queryClient = useQueryClient();
   const router = useRouter();
 

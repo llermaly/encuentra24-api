@@ -4,9 +4,15 @@ import { savedSearches, listings, favorites, pipelineItems } from '@/db/schema';
 import { buildListingWhere } from '@/db/query-builder';
 import { sql, eq, gte, and } from 'drizzle-orm';
 import type { ListingFilters } from '@/types/filters';
+import { requireUser } from '@/lib/auth';
 
 export async function POST() {
-  const searches = await db.select().from(savedSearches);
+  const user = await requireUser();
+
+  const searches = await db
+    .select()
+    .from(savedSearches)
+    .where(eq(savedSearches.userId, user.id));
 
   for (const search of searches) {
     const filters: ListingFilters = JSON.parse(search.filters);
@@ -21,8 +27,8 @@ export async function POST() {
     const countResult = await db
       .select({ count: sql<number>`count(*)` })
       .from(listings)
-      .leftJoin(favorites, eq(listings.adId, favorites.adId))
-      .leftJoin(pipelineItems, eq(listings.adId, pipelineItems.adId))
+      .leftJoin(favorites, and(eq(listings.adId, favorites.adId), eq(favorites.userId, user.id)))
+      .leftJoin(pipelineItems, and(eq(listings.adId, pipelineItems.adId), eq(pipelineItems.userId, user.id)))
       .where(combined);
 
     const now = new Date().toISOString();

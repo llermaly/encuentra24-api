@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real, index } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 // ─── Crawler tables (read-only from web app) ───────────────────────────────
 
@@ -47,7 +47,9 @@ export const listings = sqliteTable('listings', {
   hasVideo: integer('has_video', { mode: 'boolean' }),
   hasVr: integer('has_vr', { mode: 'boolean' }),
 
+  sellerId: integer('seller_id'),
   sellerName: text('seller_name'),
+  agentName: text('agent_name'),
   sellerType: text('seller_type'),
   sellerVerified: integer('seller_verified', { mode: 'boolean' }),
 
@@ -115,6 +117,23 @@ export const crawlRuns = sqliteTable('crawl_runs', {
   durationSecs: integer('duration_secs'),
 });
 
+export const sellers = sqliteTable('sellers', {
+  id: integer().primaryKey({ autoIncrement: true }),
+  name: text().notNull().unique(),
+  type: text(),
+  verified: integer({ mode: 'boolean' }).default(false),
+  whatsapp: text(),
+  phone: text(),
+  profileUrl: text('profile_url'),
+  listingCount: integer('listing_count').default(0),
+  sampleListingUrl: text('sample_listing_url'),
+  firstSeenAt: text('first_seen_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+}, (table) => [
+  index('idx_seller_name').on(table.name),
+  index('idx_seller_whatsapp').on(table.whatsapp),
+]);
+
 export const crawlErrors = sqliteTable('crawl_errors', {
   id: integer().primaryKey({ autoIncrement: true }),
   crawlRunId: integer('crawl_run_id'),
@@ -125,44 +144,53 @@ export const crawlErrors = sqliteTable('crawl_errors', {
   occurredAt: text('occurred_at').notNull(),
 });
 
-// ─── App tables (read/write from web app) ───────────────────────────────────
+// ─── App tables (read/write from web app, scoped by userId) ──────────────
 
 export const favorites = sqliteTable('favorites', {
   id: integer().primaryKey({ autoIncrement: true }),
-  adId: text('ad_id').notNull().unique(),
+  userId: text('user_id').notNull(),
+  adId: text('ad_id').notNull(),
   createdAt: text('created_at').notNull(),
 }, (table) => [
-  index('idx_fav_ad_id').on(table.adId),
+  uniqueIndex('idx_fav_user_ad').on(table.userId, table.adId),
+  index('idx_fav_user_id').on(table.userId),
 ]);
 
 export const pipelineItems = sqliteTable('pipeline_items', {
   id: integer().primaryKey({ autoIncrement: true }),
-  adId: text('ad_id').notNull().unique(),
+  userId: text('user_id').notNull(),
+  adId: text('ad_id').notNull(),
   stage: text().notNull().default('discovered'),
   position: integer().notNull().default(0),
   movedAt: text('moved_at').notNull(),
   createdAt: text('created_at').notNull(),
 }, (table) => [
-  index('idx_pipe_ad_id').on(table.adId),
+  uniqueIndex('idx_pipe_user_ad').on(table.userId, table.adId),
+  index('idx_pipe_user_id').on(table.userId),
   index('idx_pipe_stage').on(table.stage),
 ]);
 
 export const propertyNotes = sqliteTable('property_notes', {
   id: integer().primaryKey({ autoIncrement: true }),
+  userId: text('user_id').notNull(),
   adId: text('ad_id').notNull(),
   type: text().notNull().default('note'),
   content: text().notNull(),
   createdAt: text('created_at').notNull(),
 }, (table) => [
-  index('idx_notes_ad_id').on(table.adId),
+  index('idx_notes_user_ad').on(table.userId, table.adId),
+  index('idx_notes_user_id').on(table.userId),
 ]);
 
 export const savedSearches = sqliteTable('saved_searches', {
   id: integer().primaryKey({ autoIncrement: true }),
+  userId: text('user_id').notNull(),
   name: text().notNull(),
   filters: text().notNull(), // JSON serialized
   lastCheckedAt: text('last_checked_at'),
   newMatchCount: integer('new_match_count').default(0),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
-});
+}, (table) => [
+  index('idx_ss_user_id').on(table.userId),
+]);

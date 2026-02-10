@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { UserButton, useUser } from '@stackframe/stack';
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
@@ -13,6 +14,7 @@ const navItems = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const user = useUser();
 
   return (
     <aside className="w-56 bg-gray-900 text-gray-200 flex flex-col shrink-0">
@@ -40,6 +42,16 @@ export function Sidebar() {
           );
         })}
       </nav>
+      {user && (
+        <div className="p-3 border-t border-gray-700">
+          <div className="flex items-center gap-3">
+            <UserButton />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm text-white truncate">{user.displayName || user.primaryEmail}</p>
+            </div>
+          </div>
+        </div>
+      )}
     </aside>
   );
 }

@@ -27,6 +27,7 @@ interface ListingCardProps {
     firstSeenAt: string;
     publishedAt: string | null;
     sellerName: string | null;
+    agentName: string | null;
     featureLevel: string | null;
     favoritesCount: number | null;
   };
@@ -209,6 +210,14 @@ export function ListingCard({ listing }: ListingCardProps) {
         <Link href={`/listings/${listing.adId}`}>
           <p className="text-sm text-gray-700 mt-1 truncate">{listing.title}</p>
           <p className="text-xs text-gray-500 mt-0.5">{[listing.location, listing.city, listing.province].filter(Boolean).join(', ')}</p>
+          {(listing.agentName || listing.sellerName) && (
+            <p className="text-xs text-gray-500 mt-1 truncate">
+              {listing.agentName || listing.sellerName}
+              {listing.agentName && listing.sellerName && (
+                <span className="text-gray-400"> - {listing.sellerName}</span>
+              )}
+            </p>
+          )}
           <div className="flex items-center gap-3 mt-2 text-xs text-gray-600">
             {listing.bedrooms != null && (
               <span>{listing.bedrooms} bd</span>

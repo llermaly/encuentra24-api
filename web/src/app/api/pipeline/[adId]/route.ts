@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { pipelineItems } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
+import { requireUser } from '@/lib/auth';
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ adId: string }> }
 ) {
+  const user = await requireUser();
   const { adId } = await params;
   const body = await request.json();
   const now = new Date().toISOString();
@@ -23,7 +25,7 @@ export async function PATCH(
   const result = await db
     .update(pipelineItems)
     .set(updates)
-    .where(eq(pipelineItems.adId, adId))
+    .where(and(eq(pipelineItems.userId, user.id), eq(pipelineItems.adId, adId)))
     .returning();
 
   if (result.length === 0) {
@@ -37,9 +39,12 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ adId: string }> }
 ) {
+  const user = await requireUser();
   const { adId } = await params;
 
-  await db.delete(pipelineItems).where(eq(pipelineItems.adId, adId));
+  await db.delete(pipelineItems).where(
+    and(eq(pipelineItems.userId, user.id), eq(pipelineItems.adId, adId))
+  );
 
   return NextResponse.json({ success: true });
 }

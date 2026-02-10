@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { useQuery } from '@tanstack/react-query';
+import { useUser } from '@stackframe/stack';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Suspense, useCallback } from 'react';
 import { ListingFilters } from '@/components/listings/ListingFilters';
@@ -12,6 +13,7 @@ const MapView = dynamic(() => import('@/components/map/MapView').then(m => ({ de
 });
 
 function MapContent() {
+  useUser({ or: 'redirect' });
   const searchParams = useSearchParams();
   const router = useRouter();
 

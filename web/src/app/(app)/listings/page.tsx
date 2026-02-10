@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { useUser } from '@stackframe/stack';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Suspense, useState } from 'react';
 import { ListingFilters } from '@/components/listings/ListingFilters';
@@ -10,6 +11,7 @@ import { SaveSearchModal } from '@/components/saved-searches/SaveSearchModal';
 import { DEFAULT_PAGE_SIZE } from '@/lib/constants';
 
 function ListingsContent() {
+  useUser({ or: 'redirect' });
   const searchParams = useSearchParams();
   const router = useRouter();
   const [showSaveModal, setShowSaveModal] = useState(false);

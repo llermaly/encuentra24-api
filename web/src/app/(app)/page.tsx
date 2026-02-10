@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { useUser } from '@stackframe/stack';
 import { formatPrice, formatRelativeDate, formatDate } from '@/lib/formatters';
 import { PIPELINE_STAGE_LABELS, type PipelineStage } from '@/lib/constants';
 import Link from 'next/link';
@@ -33,6 +34,7 @@ interface DashboardData {
 }
 
 export default function DashboardPage() {
+  useUser({ or: 'redirect' });
   const { data, isLoading } = useQuery<DashboardData>({
     queryKey: ['dashboard'],
     queryFn: () => fetch('/api/dashboard').then(r => r.json()),
