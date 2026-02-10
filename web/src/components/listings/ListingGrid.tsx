@@ -24,6 +24,7 @@ interface ListingGridProps {
     firstSeenAt: string;
     publishedAt: string | null;
     sellerName: string | null;
+    agentName: string | null;
     featureLevel: string | null;
     favoritesCount: number | null;
   }>;
