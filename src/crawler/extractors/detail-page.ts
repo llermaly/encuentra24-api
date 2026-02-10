@@ -52,6 +52,7 @@ export interface DetailData {
 
   // Seller
   sellerName: string | null;
+  agentName: string | null;
   sellerType: string | null;
 
   // Amenities
@@ -157,6 +158,7 @@ export function extractDetailData($: CheerioAPI): DetailData {
 
     // Seller — RetailRocket vendor is cleanest, JSON-LD is prefixed
     sellerName: rr.vendor || jsonLd?.sellerName || null,
+    agentName: $('a.contact_name').first().text().trim() || null,
     sellerType: jsonLd?.sellerType || null,
 
     // Amenities

@@ -17,6 +17,14 @@ export const config = {
     listingsPerPage: 30,
     betweenCategoryDelaySecs: 5,
   },
+  scraper: {
+    headless: process.env.PW_HEADLESS !== 'false',
+    delayBetweenMs: Number(process.env.PW_DELAY_MS) || 3000,
+    pageTimeoutMs: Number(process.env.PW_TIMEOUT_MS) || 15000,
+    contactEmail: process.env.PW_CONTACT_EMAIL || 'juan.perez.panama@gmail.com',
+    contactName: process.env.PW_CONTACT_NAME || 'Juan Pérez',
+    contactPhone: process.env.PW_CONTACT_PHONE || '60001234',
+  },
   log: {
     level: process.env.LOG_LEVEL || 'info',
   },

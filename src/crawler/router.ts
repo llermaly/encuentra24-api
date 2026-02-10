@@ -236,6 +236,7 @@ router.addHandler('DETAIL', async ({ $, request }) => {
 
   // Seller
   if (detail.sellerName) updates.sellerName = detail.sellerName;
+  if (detail.agentName) updates.agentName = detail.agentName;
   if (detail.sellerType) updates.sellerType = detail.sellerType;
 
   // Amenities

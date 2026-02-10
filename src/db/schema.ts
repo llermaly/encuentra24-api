@@ -53,6 +53,7 @@ export const listings = sqliteTable('listings', {
   // Seller / Agent
   sellerId: integer('seller_id'),
   sellerName: text('seller_name'),
+  agentName: text('agent_name'),
   sellerType: text('seller_type'),
   sellerVerified: integer('seller_verified', { mode: 'boolean' }),
 

@@ -4,6 +4,7 @@ import { CheerioCrawler, Configuration, log, LogLevel } from 'crawlee';
 import { getDb } from '../../db/connection.js';
 import { listings, sellers } from '../../db/schema.js';
 import { config } from '../../config.js';
+import { scrapeWhatsAppBatch } from '../../scraper/whatsapp-scraper.js';
 
 /**
  * Populate the sellers table from existing listing data.
@@ -175,6 +176,25 @@ export const sellersCommand = new Command('sellers')
       .action(async () => {
         await syncSellers();
         await crawlSellerContacts();
+      })
+  )
+  .addCommand(
+    new Command('scrape-whatsapp')
+      .description('Scrape real WhatsApp numbers using Playwright')
+      .option('--headless', 'Run browser in headless mode (default: true)')
+      .option('--no-headless', 'Run browser in headed mode')
+      .option('--limit <n>', 'Limit number of sellers to process', parseInt)
+      .option('--dry-run', 'Show what would be scraped without doing it')
+      .option('--skip-sync', 'Skip seller sync (use existing sellers table)')
+      .action(async (opts) => {
+        if (!opts.skipSync) {
+          await syncSellers();
+        }
+        await scrapeWhatsAppBatch({
+          headless: opts.headless,
+          limit: opts.limit,
+          dryRun: opts.dryRun,
+        });
       })
   )
   .addCommand(
