@@ -195,7 +195,7 @@ export default function AgentReportPage({ params }: AgentReportPageProps) {
               <tbody>
                 {agents.map((agent: { name: string; listingCount: number; portfolioValue: number; avgPrice: number }) => (
                   <tr key={agent.name} className="border-b hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3 font-medium text-gray-900">{agent.name}</td>
+                    <td className="px-4 py-3 font-medium"><Link href={`/agents/${encodeURIComponent(agent.name)}`} className="text-blue-600 hover:underline">{agent.name}</Link></td>
                     <td className="px-4 py-3 text-right">{agent.listingCount}</td>
                     <td className="px-4 py-3 text-right">{formatPrice(agent.portfolioValue)}</td>
                     <td className="px-4 py-3 text-right">{formatPrice(agent.avgPrice)}</td>
