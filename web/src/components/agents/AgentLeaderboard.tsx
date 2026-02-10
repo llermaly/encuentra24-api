@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { formatPrice } from '@/lib/formatters';
@@ -54,14 +54,16 @@ export function AgentLeaderboard() {
   const [sort, setSort] = useState('listings_desc');
   const [page, setPage] = useState(1);
 
-  const handleSearch = useCallback((value: string) => {
-    setSearch(value);
-    const timeout = setTimeout(() => {
-      setDebouncedSearch(value);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
+
+  useEffect(() => {
+    if (search === debouncedSearch) return;
+    searchTimerRef.current = setTimeout(() => {
+      setDebouncedSearch(search);
       setPage(1);
-    }, 300);
-    return () => clearTimeout(timeout);
-  }, []);
+    }, 400);
+    return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current); };
+  }, [search]);
 
   const queryString = new URLSearchParams({
     view,
@@ -115,7 +117,7 @@ export function AgentLeaderboard() {
           type="text"
           placeholder={view === 'agencies' ? 'Search agencies...' : 'Search agents...'}
           value={search}
-          onChange={e => handleSearch(e.target.value)}
+          onChange={e => setSearch(e.target.value)}
           className="px-3 py-2 border rounded-md text-sm w-64 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
 

@@ -111,16 +111,12 @@ export function ListingFilters({ searchParams, onUpdate }: ListingFiltersProps) 
             onMinChange={v => onUpdate({ areaMin: v || undefined })}
             onMaxChange={v => onUpdate({ areaMax: v || undefined })}
           />
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Bathrooms Min</label>
-            <input
-              type="number"
-              value={searchParams.get('bathroomsMin') || ''}
-              onChange={e => onUpdate({ bathroomsMin: e.target.value || undefined })}
-              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded text-gray-900"
-              min="0"
-            />
-          </div>
+          <DebouncedNumberInput
+            label="Bathrooms Min"
+            value={searchParams.get('bathroomsMin') || ''}
+            onChange={v => onUpdate({ bathroomsMin: v || undefined })}
+            min="0"
+          />
           <div>
             <label className="block text-xs text-gray-500 mb-1">City</label>
             <select
@@ -293,6 +289,24 @@ function RangeFilter({
   onMinChange: (value: string) => void;
   onMaxChange: (value: string) => void;
 }) {
+  const [localMin, setLocalMin] = useState(minValue);
+  const [localMax, setLocalMax] = useState(maxValue);
+
+  useEffect(() => { setLocalMin(minValue); }, [minValue]);
+  useEffect(() => { setLocalMax(maxValue); }, [maxValue]);
+
+  useEffect(() => {
+    if (localMin === minValue) return;
+    const timer = setTimeout(() => onMinChange(localMin), 400);
+    return () => clearTimeout(timer);
+  }, [localMin]);
+
+  useEffect(() => {
+    if (localMax === maxValue) return;
+    const timer = setTimeout(() => onMaxChange(localMax), 400);
+    return () => clearTimeout(timer);
+  }, [localMax]);
+
   return (
     <div>
       <label className="block text-xs text-gray-500 mb-1">{label}</label>
@@ -300,18 +314,53 @@ function RangeFilter({
         <input
           type="number"
           placeholder="Min"
-          value={minValue}
-          onChange={e => onMinChange(e.target.value)}
+          value={localMin}
+          onChange={e => setLocalMin(e.target.value)}
           className="w-1/2 px-2 py-1.5 text-sm border border-gray-300 rounded text-gray-900 placeholder:text-gray-400"
         />
         <input
           type="number"
           placeholder="Max"
-          value={maxValue}
-          onChange={e => onMaxChange(e.target.value)}
+          value={localMax}
+          onChange={e => setLocalMax(e.target.value)}
           className="w-1/2 px-2 py-1.5 text-sm border border-gray-300 rounded text-gray-900 placeholder:text-gray-400"
         />
       </div>
+    </div>
+  );
+}
+
+function DebouncedNumberInput({
+  label,
+  value,
+  onChange,
+  min,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  min?: string;
+}) {
+  const [local, setLocal] = useState(value);
+
+  useEffect(() => { setLocal(value); }, [value]);
+
+  useEffect(() => {
+    if (local === value) return;
+    const timer = setTimeout(() => onChange(local), 400);
+    return () => clearTimeout(timer);
+  }, [local]);
+
+  return (
+    <div>
+      <label className="block text-xs text-gray-500 mb-1">{label}</label>
+      <input
+        type="number"
+        value={local}
+        onChange={e => setLocal(e.target.value)}
+        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded text-gray-900"
+        min={min}
+      />
     </div>
   );
 }
