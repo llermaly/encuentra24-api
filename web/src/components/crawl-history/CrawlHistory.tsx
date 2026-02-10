@@ -19,7 +19,7 @@ interface CrawlRun {
   errors: number;
   durationSecs: number | null;
   errorCount: number;
-  isFullCrawl: boolean;
+  crawlType: string;
 }
 
 interface DailyStat {
@@ -73,10 +73,16 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function TypeBadge({ isFullCrawl }: { isFullCrawl: boolean }) {
-  return isFullCrawl
-    ? <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">Full</span>
-    : <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">Incremental</span>;
+function TypeBadge({ type }: { type: string }) {
+  const styles: Record<string, string> = {
+    full: 'bg-purple-100 text-purple-800',
+    incremental: 'bg-blue-100 text-blue-800',
+  };
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium capitalize ${styles[type] || 'bg-gray-100 text-gray-800'}`}>
+      {type}
+    </span>
+  );
 }
 
 function DailyChart({ dailyStats }: { dailyStats: DailyStat[] }) {
@@ -208,7 +214,7 @@ export function CrawlHistory() {
                     {formatTime(run.startedAt)}
                   </td>
                   <td className="px-4 py-3">
-                    <TypeBadge isFullCrawl={run.isFullCrawl} />
+                    <TypeBadge type={run.crawlType} />
                   </td>
                   <td className="px-4 py-3">
                     <StatusBadge status={run.status} />

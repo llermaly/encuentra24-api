@@ -102,6 +102,7 @@ export const priceHistory = sqliteTable('price_history', {
 
 export const crawlRuns = sqliteTable('crawl_runs', {
   id: integer().primaryKey({ autoIncrement: true }),
+  type: text().default('incremental'),
   startedAt: text('started_at').notNull(),
   finishedAt: text('finished_at'),
   status: text().notNull(),

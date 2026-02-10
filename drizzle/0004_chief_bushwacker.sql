@@ -1,0 +1,1 @@
+ALTER TABLE `crawl_runs` ADD `type` text DEFAULT 'incremental';

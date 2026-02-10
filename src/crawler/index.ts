@@ -100,7 +100,9 @@ export async function runCrawl(options: CrawlOptions): Promise<void> {
   const startedAt = new Date().toISOString();
 
   // Create crawl run record
+  const crawlType = full || detailOnly ? 'full' : 'incremental';
   const crawlRun = await db.insert(crawlRuns).values({
+    type: crawlType,
     startedAt,
     status: 'running',
     category: category || null,
