@@ -56,7 +56,8 @@ export async function GET(request: NextRequest) {
     runs: runs.map(r => ({
       ...r,
       errorCount: errorMap.get(r.id) || r.errors || 0,
-      isFullCrawl: (r.listingsFound ?? 0) > 1000 || (r.durationSecs ?? 0) > 600,
+      // Full crawl: processes thousands of detail pages and takes 10+ minutes
+      isFullCrawl: (r.detailsCrawled ?? 0) > 500 || (r.durationSecs ?? 0) > 600,
     })),
     pagination: {
       page,
