@@ -1,8 +1,11 @@
 #!/bin/bash
 # VM crawl script - called by GCE startup-script on boot
 # Auto-detects Sunday for full crawl, otherwise incremental
-# Shuts down the VM after completion
-set -euo pipefail
+# Shuts down the VM after completion (even on failure)
+set -uo pipefail
+
+# Always shut down VM on exit, no matter what happens
+trap 'echo "[$(date)] Shutting down VM..." >> "${LOGFILE:-/tmp/crawl.log}" 2>&1; shutdown -h now' EXIT
 
 WORKDIR="/home/gustavo/encuentra24-api"
 LOG_DIR="$WORKDIR/data"
@@ -12,11 +15,22 @@ DAY_OF_WEEK=$(date '+%u') # 1=Monday, 7=Sunday
 mkdir -p "$LOG_DIR"
 cd "$WORKDIR"
 
-# Determine crawl mode
-if [ "$DAY_OF_WEEK" = "7" ]; then
+# Check for metadata override (e.g. gcloud compute instances add-metadata ... --metadata crawl-mode=full)
+CRAWL_MODE=$(curl -sf -H "Metadata-Flavor: Google" \
+  "http://metadata.google.internal/computeMetadata/v1/instance/attributes/crawl-mode" 2>/dev/null || echo "")
+
+# Auto-clear the override so it's a one-shot trigger
+if [ -n "$CRAWL_MODE" ]; then
+  gcloud compute instances remove-metadata "$(hostname)" \
+    --zone="$(curl -sf -H 'Metadata-Flavor: Google' http://metadata.google.internal/computeMetadata/v1/instance/zone 2>/dev/null | awk -F/ '{print $NF}')" \
+    --keys=crawl-mode 2>/dev/null || true
+fi
+
+# Determine crawl mode: metadata override > Sunday auto-detect > incremental
+if [ "$CRAWL_MODE" = "full" ] || [ "$DAY_OF_WEEK" = "7" ]; then
   CRAWL_ARGS="--full"
   LOGFILE="$LOG_DIR/crawl-full-${TIMESTAMP}.log"
-  echo "[$(date)] Starting FULL crawl (Sunday)" | tee "$LOGFILE"
+  echo "[$(date)] Starting FULL crawl (mode=$CRAWL_MODE, day=$DAY_OF_WEEK)" | tee "$LOGFILE"
 else
   CRAWL_ARGS=""
   LOGFILE="$LOG_DIR/crawl-incr-${TIMESTAMP}.log"
@@ -29,11 +43,11 @@ su - gustavo -c "cd $WORKDIR && git pull origin main" >> "$LOGFILE" 2>&1 || true
 
 # Install deps if needed
 echo "[$(date)] Checking dependencies..." >> "$LOGFILE" 2>&1
-su - gustavo -c "cd $WORKDIR && npm install --omit=dev" >> "$LOGFILE" 2>&1
+su - gustavo -c "cd $WORKDIR && npm install --omit=dev" >> "$LOGFILE" 2>&1 || true
 
 # Run crawl as gustavo user
 echo "[$(date)] Running crawl..." >> "$LOGFILE" 2>&1
-su - gustavo -c "cd $WORKDIR && npx tsx src/index.ts crawl $CRAWL_ARGS" >> "$LOGFILE" 2>&1
+su - gustavo -c "cd $WORKDIR && npx tsx src/index.ts crawl $CRAWL_ARGS" >> "$LOGFILE" 2>&1 || true
 EXIT_CODE=$?
 
 echo "[$(date)] Crawl finished with exit code $EXIT_CODE" >> "$LOGFILE" 2>&1
@@ -41,6 +55,4 @@ echo "[$(date)] Crawl finished with exit code $EXIT_CODE" >> "$LOGFILE" 2>&1
 # Clean up old logs (keep last 30)
 ls -t "$LOG_DIR"/crawl-*.log 2>/dev/null | tail -n +31 | xargs rm -f 2>/dev/null || true
 
-# Shutdown VM after crawl
-echo "[$(date)] Shutting down VM..." >> "$LOGFILE" 2>&1
-shutdown -h now
+# VM shutdown handled by EXIT trap
