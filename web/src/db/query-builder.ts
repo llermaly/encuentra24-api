@@ -1,4 +1,4 @@
-import { and, eq, gte, lte, like, isNotNull, sql, desc, asc, SQL } from 'drizzle-orm';
+import { and, eq, gte, lte, isNotNull, sql, desc, asc, SQL } from 'drizzle-orm';
 import { listings, favorites, pipelineItems } from './schema';
 import type { ListingFilters } from '@/types/filters';
 import { DEFAULT_PAGE_SIZE } from '@/lib/constants';
@@ -22,7 +22,7 @@ export function buildListingWhere(filters: ListingFilters): SQL | undefined {
   if (filters.areaMax != null) conditions.push(lte(listings.builtAreaSqm, filters.areaMax));
   if (filters.landAreaMin != null) conditions.push(gte(listings.landAreaSqm, filters.landAreaMin));
   if (filters.landAreaMax != null) conditions.push(lte(listings.landAreaSqm, filters.landAreaMax));
-  if (filters.location) conditions.push(like(listings.location, `%${filters.location}%`));
+  if (filters.location) conditions.push(eq(listings.location, filters.location));
   if (filters.province) conditions.push(eq(listings.province, filters.province));
   if (filters.city) conditions.push(eq(listings.city, filters.city));
   if (filters.publishedAfter) conditions.push(gte(listings.publishedAt, filters.publishedAfter));

@@ -95,6 +95,11 @@ export const listings = sqliteTable('listings', {
   index('idx_year_built').on(table.yearBuilt),
   index('idx_category_location').on(table.category, table.location),
   index('idx_category_price').on(table.category, table.price),
+  index('idx_published_at').on(table.publishedAt),
+  index('idx_first_seen_at').on(table.firstSeenAt),
+  index('idx_removed_at').on(table.removedAt),
+  index('idx_category_published').on(table.category, table.publishedAt),
+  index('idx_subcategory_published').on(table.subcategory, table.publishedAt),
 ]);
 
 export const priceHistory = sqliteTable('price_history', {
