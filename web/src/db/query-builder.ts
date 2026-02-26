@@ -7,8 +7,9 @@ export function buildListingWhere(filters: ListingFilters): SQL | undefined {
   const conditions: SQL[] = [];
 
   if (filters.q) {
+    // Use FTS5 virtual table for fast full-text search
     conditions.push(
-      sql`(${listings.title} LIKE ${'%' + filters.q + '%'} OR ${listings.description} LIKE ${'%' + filters.q + '%'} OR ${listings.location} LIKE ${'%' + filters.q + '%'})`
+      sql`${listings.adId} IN (SELECT ad_id FROM listings_fts WHERE listings_fts MATCH ${filters.q})`
     );
   }
   if (filters.category) conditions.push(eq(listings.category, filters.category));

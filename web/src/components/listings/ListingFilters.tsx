@@ -30,15 +30,12 @@ export function ListingFilters({ searchParams, onUpdate }: ListingFiltersProps) 
     setQ(searchParams.get('q') || '');
   }, [searchParams]);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      const current = searchParams.get('q') || '';
-      if (q !== current) {
-        onUpdate({ q: q || undefined });
-      }
-    }, 400);
-    return () => clearTimeout(timer);
-  }, [q]);
+  const submitSearch = () => {
+    const current = searchParams.get('q') || '';
+    if (q !== current) {
+      onUpdate({ q: q || undefined });
+    }
+  };
 
   const locationOptions = (catData?.locations || []).map(l => ({
     value: l.location,
@@ -53,14 +50,21 @@ export function ListingFilters({ searchParams, onUpdate }: ListingFiltersProps) 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4 mb-4">
       <div className="flex flex-wrap gap-3 items-end">
-        <div className="flex-1 min-w-[200px]">
+        <div className="flex-1 min-w-[200px] flex gap-1">
           <input
             type="text"
             placeholder="Search by title, description..."
             value={q}
             onChange={e => setQ(e.target.value)}
-            className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            onKeyDown={e => { if (e.key === 'Enter') submitSearch(); }}
+            className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
+          <button
+            onClick={submitSearch}
+            className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Search
+          </button>
         </div>
         <SearchableSelect
           placeholder="All Locations"
