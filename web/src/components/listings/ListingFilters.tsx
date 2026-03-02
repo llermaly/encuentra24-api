@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { CATEGORY_OPTIONS, SUBCATEGORY_OPTIONS } from '@/lib/constants';
 
@@ -22,7 +22,11 @@ export function ListingFilters({ searchParams, onUpdate }: ListingFiltersProps) 
 
   const { data: catData } = useQuery<CategoriesData>({
     queryKey: ['categories'],
-    queryFn: () => fetch('/api/categories').then(r => r.json()),
+    queryFn: async () => {
+      const r = await fetch('/api/categories');
+      if (!r.ok) throw new Error(`Categories fetch failed: ${r.status}`);
+      return r.json();
+    },
     staleTime: 5 * 60 * 1000,
   });
 
@@ -37,15 +41,26 @@ export function ListingFilters({ searchParams, onUpdate }: ListingFiltersProps) 
     }
   };
 
-  const locationOptions = (catData?.locations || []).map(l => ({
-    value: l.location,
-    label: `${l.location} (${l.count})`,
-  }));
+  const onLocationChange = useCallback(
+    (v: string) => onUpdate({ location: v || undefined }),
+    [onUpdate]
+  );
 
-  const cityOptions = (catData?.cities || []).map(c => ({
-    value: c.city,
-    label: `${c.city} (${c.count})`,
-  }));
+  const locationOptions = useMemo(
+    () => (catData?.locations || []).map(l => ({
+      value: l.location,
+      label: `${l.location} (${l.count})`,
+    })),
+    [catData?.locations]
+  );
+
+  const cityOptions = useMemo(
+    () => (catData?.cities || []).map(c => ({
+      value: c.city,
+      label: `${c.city} (${c.count})`,
+    })),
+    [catData?.cities]
+  );
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4 mb-4">
@@ -70,7 +85,7 @@ export function ListingFilters({ searchParams, onUpdate }: ListingFiltersProps) 
           placeholder="All Locations"
           value={searchParams.get('location') || ''}
           options={locationOptions}
-          onChange={v => onUpdate({ location: v || undefined })}
+          onChange={onLocationChange}
         />
         <SelectFilter
           label="Categories"
@@ -167,7 +182,7 @@ export function ListingFilters({ searchParams, onUpdate }: ListingFiltersProps) 
   );
 }
 
-function SearchableSelect({
+const SearchableSelect = memo(function SearchableSelect({
   placeholder,
   value,
   options,
@@ -192,8 +207,9 @@ function SearchableSelect({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const filtered = options.filter(o =>
-    o.value.toLowerCase().includes(search.toLowerCase())
+  const filtered = useMemo(
+    () => options.filter(o => o.value.toLowerCase().includes(search.toLowerCase())),
+    [options, search]
   );
 
   return (
@@ -251,7 +267,7 @@ function SearchableSelect({
       )}
     </div>
   );
-}
+});
 
 function SelectFilter({
   label,

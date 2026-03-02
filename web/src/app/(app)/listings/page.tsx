@@ -3,7 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useUser } from '@stackframe/stack';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Suspense, useState } from 'react';
+import { Suspense, useState, useCallback, useRef } from 'react';
 import { ListingFilters } from '@/components/listings/ListingFilters';
 import { ListingGrid } from '@/components/listings/ListingGrid';
 import { ListingSortBar } from '@/components/listings/ListingSortBar';
@@ -24,8 +24,11 @@ function ListingsContent() {
     queryFn: () => fetch(`/api/listings?${queryString}`).then(r => r.json()),
   });
 
-  function updateParams(updates: Record<string, string | undefined>) {
-    const params = new URLSearchParams(searchParams.toString());
+  const searchParamsRef = useRef(searchParams);
+  searchParamsRef.current = searchParams;
+
+  const updateParams = useCallback((updates: Record<string, string | undefined>) => {
+    const params = new URLSearchParams(searchParamsRef.current.toString());
     for (const [key, value] of Object.entries(updates)) {
       if (value == null || value === '') {
         params.delete(key);
@@ -35,7 +38,7 @@ function ListingsContent() {
     }
     if (!('page' in updates)) params.delete('page');
     router.push(`/listings?${params.toString()}`);
-  }
+  }, [router]);
 
   const currentFilters: Record<string, string> = {};
   searchParams.forEach((value, key) => {

@@ -4,7 +4,6 @@ import { listings } from '@/db/schema';
 import { sql } from 'drizzle-orm';
 
 export async function GET() {
-  // Run all 4 aggregations in parallel instead of sequential
   const [categories, provinces, cities, locations] = await Promise.all([
     db
       .select({
@@ -46,8 +45,5 @@ export async function GET() {
       .orderBy(listings.location),
   ]);
 
-  return NextResponse.json(
-    { categories, provinces, cities, locations },
-    { headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=7200' } },
-  );
+  return NextResponse.json({ categories, provinces, cities, locations });
 }
