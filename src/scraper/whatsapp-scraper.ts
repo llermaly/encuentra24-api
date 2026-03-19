@@ -119,8 +119,7 @@ export async function scrapeWhatsAppBatch(options: ScrapeWhatsAppOptions = {}) {
       listing_url: sellers.sampleListingUrl,
     })
     .from(sellers)
-    .where(sql`(${sellers.whatsapp} IS NULL OR ${sellers.whatsapp} = ${GENERIC_WA}) AND ${sellers.sampleListingUrl} IS NOT NULL`)
-    .all() as Array<{ id: number; name: string; listing_url: string }>;
+    .where(sql`(${sellers.whatsapp} IS NULL OR ${sellers.whatsapp} = ${GENERIC_WA}) AND ${sellers.sampleListingUrl} IS NOT NULL`) as unknown as Array<{ id: number; name: string; listing_url: string }>;
 
   if (sellersWithUrls.length === 0) {
     console.log('No sellers need WhatsApp scraping.');

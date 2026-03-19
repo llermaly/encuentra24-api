@@ -9,7 +9,7 @@ export const statusCommand = new Command('status')
     const db = getDb();
 
     // Total listings
-    const [total] = await db.select({ count: sql<number>`count(*)` }).from(listings).all();
+    const [total] = await db.select({ count: sql<number>`count(*)` }).from(listings);
 
     // By category
     const byCategory = await db
@@ -18,8 +18,7 @@ export const statusCommand = new Command('status')
         count: sql<number>`count(*)`,
       })
       .from(listings)
-      .groupBy(listings.category)
-      .all();
+      .groupBy(listings.category);
 
     // By subcategory (top 10)
     const bySubcategory = await db
@@ -30,30 +29,26 @@ export const statusCommand = new Command('status')
       .from(listings)
       .groupBy(listings.subcategory)
       .orderBy(sql`count(*) DESC`)
-      .limit(10)
-      .all();
+      .limit(10);
 
     // Detail crawled stats
     const [detailStats] = await db
       .select({
-        crawled: sql<number>`SUM(CASE WHEN detail_crawled = 1 THEN 1 ELSE 0 END)`,
-        uncrawled: sql<number>`SUM(CASE WHEN detail_crawled = 0 THEN 1 ELSE 0 END)`,
+        crawled: sql<number>`SUM(CASE WHEN detail_crawled = true THEN 1 ELSE 0 END)`,
+        uncrawled: sql<number>`SUM(CASE WHEN detail_crawled = false THEN 1 ELSE 0 END)`,
       })
-      .from(listings)
-      .all();
+      .from(listings);
 
     // Price history entries
     const [priceHistoryCount] = await db
       .select({ count: sql<number>`count(*)` })
-      .from(priceHistory)
-      .all();
+      .from(priceHistory);
 
     // Removed listings
     const [removed] = await db
       .select({ count: sql<number>`count(*)` })
       .from(listings)
-      .where(sql`removed_at IS NOT NULL`)
-      .all();
+      .where(sql`removed_at IS NOT NULL`);
 
     // Last crawl run
     const lastRun = await db
@@ -61,13 +56,12 @@ export const statusCommand = new Command('status')
       .from(crawlRuns)
       .orderBy(sql`id DESC`)
       .limit(1)
-      .get();
+      .then(r => r[0]);
 
     // Error count
     const [errorCount] = await db
       .select({ count: sql<number>`count(*)` })
-      .from(crawlErrors)
-      .all();
+      .from(crawlErrors);
 
     // Display
     console.log('=== Encuentra24 Database Status ===\n');

@@ -1,9 +1,9 @@
-import { sqliteTable, text, integer, real, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { pgTable, text, integer, doublePrecision, boolean, serial, index, uniqueIndex, jsonb } from 'drizzle-orm/pg-core';
 
 // ─── Crawler tables (read-only from web app) ───────────────────────────────
 
-export const listings = sqliteTable('listings', {
-  id: integer().primaryKey({ autoIncrement: true }),
+export const listings = pgTable('listings', {
+  id: serial().primaryKey(),
   adId: text('ad_id').notNull().unique(),
   slug: text(),
   url: text().notNull(),
@@ -14,50 +14,50 @@ export const listings = sqliteTable('listings', {
 
   title: text(),
   description: text(),
-  price: real(),
+  price: doublePrecision(),
   currency: text().default('USD'),
-  oldPrice: real('old_price'),
-  pricePerSqmConstruction: real('price_per_sqm_construction'),
-  pricePerSqmLand: real('price_per_sqm_land'),
+  oldPrice: doublePrecision('old_price'),
+  pricePerSqmConstruction: doublePrecision('price_per_sqm_construction'),
+  pricePerSqmLand: doublePrecision('price_per_sqm_land'),
 
   province: text(),
   city: text(),
   location: text(),
   address: text(),
   regionSlug: text('region_slug'),
-  latitude: real(),
-  longitude: real(),
+  latitude: doublePrecision(),
+  longitude: doublePrecision(),
 
   bedrooms: integer(),
-  bathrooms: real(),
+  bathrooms: doublePrecision(),
   parking: integer(),
-  builtAreaSqm: real('built_area_sqm'),
-  landAreaSqm: real('land_area_sqm'),
-  totalSqm: real('total_sqm'),
+  builtAreaSqm: doublePrecision('built_area_sqm'),
+  landAreaSqm: doublePrecision('land_area_sqm'),
+  totalSqm: doublePrecision('total_sqm'),
   yearBuilt: integer('year_built'),
   levels: integer(),
   floorNumber: integer('floor_number'),
   floorType: text('floor_type'),
-  ceilingHeight: real('ceiling_height'),
-  maintenanceCost: real('maintenance_cost'),
+  ceilingHeight: doublePrecision('ceiling_height'),
+  maintenanceCost: doublePrecision('maintenance_cost'),
   titleStatus: text('title_status'),
 
-  images: text({ mode: 'json' }).$type<string[]>(),
+  images: jsonb().$type<string[]>(),
   imageCount: integer('image_count').default(0),
-  hasVideo: integer('has_video', { mode: 'boolean' }),
-  hasVr: integer('has_vr', { mode: 'boolean' }),
+  hasVideo: boolean('has_video'),
+  hasVr: boolean('has_vr'),
 
   sellerId: integer('seller_id'),
   sellerName: text('seller_name'),
   agentName: text('agent_name'),
   sellerType: text('seller_type'),
-  sellerVerified: integer('seller_verified', { mode: 'boolean' }),
+  sellerVerified: boolean('seller_verified'),
 
   featureLevel: text('feature_level'),
-  discountPct: real('discount_pct'),
+  discountPct: doublePrecision('discount_pct'),
   favoritesCount: integer('favorites_count'),
 
-  amenities: text({ mode: 'json' }).$type<string[]>(),
+  amenities: jsonb().$type<string[]>(),
 
   publishedAt: text('published_at'),
   firstSeenAt: text('first_seen_at').notNull(),
@@ -65,7 +65,7 @@ export const listings = sqliteTable('listings', {
   removedAt: text('removed_at'),
   updatedAt: text('updated_at').notNull(),
 
-  detailCrawled: integer('detail_crawled', { mode: 'boolean' }).default(false),
+  detailCrawled: boolean('detail_crawled').default(false),
   crawlVersion: integer('crawl_version').default(1),
 
   rawJsonLd: text('raw_json_ld'),
@@ -95,10 +95,10 @@ export const listings = sqliteTable('listings', {
   index('idx_subcategory_published').on(table.subcategory, table.publishedAt),
 ]);
 
-export const priceHistory = sqliteTable('price_history', {
-  id: integer().primaryKey({ autoIncrement: true }),
+export const priceHistory = pgTable('price_history', {
+  id: serial().primaryKey(),
   adId: text('ad_id').notNull(),
-  price: real().notNull(),
+  price: doublePrecision().notNull(),
   currency: text().default('USD'),
   source: text(),
   recordedAt: text('recorded_at').notNull(),
@@ -107,8 +107,8 @@ export const priceHistory = sqliteTable('price_history', {
   index('idx_ph_recorded_at').on(table.recordedAt),
 ]);
 
-export const crawlRuns = sqliteTable('crawl_runs', {
-  id: integer().primaryKey({ autoIncrement: true }),
+export const crawlRuns = pgTable('crawl_runs', {
+  id: serial().primaryKey(),
   type: text().default('incremental'),
   startedAt: text('started_at').notNull(),
   finishedAt: text('finished_at'),
@@ -125,11 +125,11 @@ export const crawlRuns = sqliteTable('crawl_runs', {
   durationSecs: integer('duration_secs'),
 });
 
-export const sellers = sqliteTable('sellers', {
-  id: integer().primaryKey({ autoIncrement: true }),
+export const sellers = pgTable('sellers', {
+  id: serial().primaryKey(),
   name: text().notNull().unique(),
   type: text(),
-  verified: integer({ mode: 'boolean' }).default(false),
+  verified: boolean().default(false),
   whatsapp: text(),
   phone: text(),
   profileUrl: text('profile_url'),
@@ -142,8 +142,8 @@ export const sellers = sqliteTable('sellers', {
   index('idx_seller_whatsapp').on(table.whatsapp),
 ]);
 
-export const crawlErrors = sqliteTable('crawl_errors', {
-  id: integer().primaryKey({ autoIncrement: true }),
+export const crawlErrors = pgTable('crawl_errors', {
+  id: serial().primaryKey(),
   crawlRunId: integer('crawl_run_id'),
   url: text().notNull(),
   errorType: text('error_type').notNull(),
@@ -154,8 +154,8 @@ export const crawlErrors = sqliteTable('crawl_errors', {
 
 // ─── App tables (read/write from web app, scoped by userId) ──────────────
 
-export const favorites = sqliteTable('favorites', {
-  id: integer().primaryKey({ autoIncrement: true }),
+export const favorites = pgTable('favorites', {
+  id: serial().primaryKey(),
   userId: text('user_id').notNull(),
   adId: text('ad_id').notNull(),
   createdAt: text('created_at').notNull(),
@@ -164,8 +164,8 @@ export const favorites = sqliteTable('favorites', {
   index('idx_fav_user_id').on(table.userId),
 ]);
 
-export const pipelineItems = sqliteTable('pipeline_items', {
-  id: integer().primaryKey({ autoIncrement: true }),
+export const pipelineItems = pgTable('pipeline_items', {
+  id: serial().primaryKey(),
   userId: text('user_id').notNull(),
   adId: text('ad_id').notNull(),
   stage: text().notNull().default('discovered'),
@@ -178,8 +178,8 @@ export const pipelineItems = sqliteTable('pipeline_items', {
   index('idx_pipe_stage').on(table.stage),
 ]);
 
-export const propertyNotes = sqliteTable('property_notes', {
-  id: integer().primaryKey({ autoIncrement: true }),
+export const propertyNotes = pgTable('property_notes', {
+  id: serial().primaryKey(),
   userId: text('user_id').notNull(),
   adId: text('ad_id').notNull(),
   type: text().notNull().default('note'),
@@ -190,11 +190,11 @@ export const propertyNotes = sqliteTable('property_notes', {
   index('idx_notes_user_id').on(table.userId),
 ]);
 
-export const savedSearches = sqliteTable('saved_searches', {
-  id: integer().primaryKey({ autoIncrement: true }),
+export const savedSearches = pgTable('saved_searches', {
+  id: serial().primaryKey(),
   userId: text('user_id').notNull(),
   name: text().notNull(),
-  filters: text().notNull(), // JSON serialized
+  filters: text().notNull(),
   lastCheckedAt: text('last_checked_at'),
   newMatchCount: integer('new_match_count').default(0),
   createdAt: text('created_at').notNull(),

@@ -1,35 +1,22 @@
-import { createClient } from '@libsql/client';
-import { drizzle } from 'drizzle-orm/libsql';
-import * as schema from './schema.js';
+import postgres from 'postgres';
+import { drizzle } from 'drizzle-orm/postgres-js';
 import { config } from '../config.js';
-import { mkdirSync } from 'node:fs';
-import { dirname } from 'node:path';
+import * as schema from './schema.js';
 
-let db: ReturnType<typeof createDb> | null = null;
+let db: ReturnType<typeof drizzle> | null = null;
 
-function createDb() {
-  const { tursoUrl, tursoAuthToken, path } = config.database;
-
-  let client;
-  if (tursoUrl) {
-    console.log('Connecting to Turso:', tursoUrl);
-    client = createClient({
-      url: tursoUrl,
-      authToken: tursoAuthToken,
-    });
-  } else {
-    mkdirSync(dirname(path), { recursive: true });
-    client = createClient({
-      url: `file:${path}`,
-    });
+export async function initDb() {
+  if (!db) {
+    const url = config.database.url;
+    console.log('Connecting to PostgreSQL:', url.replace(/:[^:@]+@/, ':***@'));
+    const client = postgres(url);
+    db = drizzle(client, { schema });
   }
-
-  return drizzle(client, { schema });
 }
 
 export function getDb() {
   if (!db) {
-    db = createDb();
+    throw new Error('Database not initialized. Call initDb() first.');
   }
   return db;
 }

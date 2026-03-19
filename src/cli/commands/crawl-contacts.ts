@@ -9,8 +9,7 @@ async function main() {
   const pending = await db
     .select({ id: sellers.id, name: sellers.name, sampleListingUrl: sellers.sampleListingUrl })
     .from(sellers)
-    .where(sql`${sellers.whatsapp} IS NULL AND ${sellers.sampleListingUrl} IS NOT NULL`)
-    .all();
+    .where(sql`${sellers.whatsapp} IS NULL AND ${sellers.sampleListingUrl} IS NOT NULL`);
 
   console.log(`Sellers to crawl: ${pending.length}`);
   if (pending.length === 0) return;

@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 interface CrawlRun {
   id: number;
@@ -63,7 +64,7 @@ function formatTime(iso: string): string {
 function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
     completed: 'bg-green-100 text-green-800',
-    running: 'bg-yellow-100 text-yellow-800',
+    running: 'bg-yellow-100 text-yellow-800 animate-pulse',
     failed: 'bg-red-100 text-red-800',
   };
   return (
@@ -120,18 +121,13 @@ function DailyChart({ dailyStats }: { dailyStats: DailyStat[] }) {
   );
 }
 
-function SummaryCards({ dailyStats, runs }: { dailyStats: DailyStat[]; runs: CrawlRun[] }) {
+function SummaryCards({ dailyStats }: { dailyStats: DailyStat[] }) {
   const totalRuns = dailyStats.reduce((s, d) => s + d.run_count, 0);
   const totalNew = dailyStats.reduce((s, d) => s + (d.total_new || 0), 0);
   const totalErrors = dailyStats.reduce((s, d) => s + (d.total_errors || 0), 0);
   const avgDuration = totalRuns > 0
     ? Math.round(dailyStats.reduce((s, d) => s + (d.avg_duration || 0) * d.run_count, 0) / totalRuns)
     : 0;
-
-  const lastRun = runs[0];
-  const nextHour = lastRun
-    ? new Date(new Date(lastRun.startedAt).getTime() + 60 * 60 * 1000)
-    : null;
 
   const cards = [
     { label: 'Runs (30d)', value: totalRuns, color: 'text-blue-600' },
@@ -154,6 +150,7 @@ function SummaryCards({ dailyStats, runs }: { dailyStats: DailyStat[]; runs: Cra
 
 export function CrawlHistory() {
   const [page, setPage] = useState(1);
+  const router = useRouter();
 
   const { data, isLoading } = useQuery<CrawlHistoryResponse>({
     queryKey: ['crawl-history', page],
@@ -183,7 +180,7 @@ export function CrawlHistory() {
 
   return (
     <div>
-      <SummaryCards dailyStats={dailyStats} runs={runs} />
+      <SummaryCards dailyStats={dailyStats} />
       <DailyChart dailyStats={dailyStats} />
 
       <div className="bg-white rounded-lg shadow">
@@ -209,7 +206,11 @@ export function CrawlHistory() {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {runs.map((run) => (
-                <tr key={run.id} className="hover:bg-gray-50">
+                <tr
+                  key={run.id}
+                  onClick={() => router.push(`/crawl-history/${run.id}`)}
+                  className={`hover:bg-gray-50 cursor-pointer ${run.status === 'running' ? 'bg-yellow-50 hover:bg-yellow-100' : ''}`}
+                >
                   <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">
                     {formatTime(run.startedAt)}
                   </td>

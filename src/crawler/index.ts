@@ -4,8 +4,8 @@ import { rmSync } from 'node:fs';
 import { router } from './router.js';
 import { findCategory, buildListUrl, type CategoryConfig } from './categories.js';
 import { config } from '../config.js';
-import { getDb } from '../db/connection.js';
-import { listings, crawlRuns } from '../db/schema.js';
+import { getDb, initDb } from '../db/connection.js';
+import { listings, crawlRuns, crawlErrors } from '../db/schema.js';
 
 export interface CrawlOptions {
   category?: string;
@@ -45,7 +45,7 @@ function createCrawler() {
 
       log.error(`Request failed: ${request.url}`, { error: errMsg });
 
-      await db.insert((await import('../db/schema.js')).crawlErrors).values({
+      await db.insert(crawlErrors).values({
         crawlRunId: crawlRunId || null,
         url: request.url,
         errorType: statusCode === 429 ? 'blocked'
@@ -86,6 +86,9 @@ export async function runCrawl(options: CrawlOptions): Promise<void> {
   // Set log level
   log.setLevel(logLevel === 'debug' ? LogLevel.DEBUG : LogLevel.INFO);
 
+  // Initialize database connection
+  await initDb();
+
   // Clean up stale storage from previous crashed runs
   try {
     rmSync('./storage', { recursive: true, force: true });
@@ -93,7 +96,7 @@ export async function runCrawl(options: CrawlOptions): Promise<void> {
     // ignore if doesn't exist
   }
 
-  // Disable persistent storage — our data lives in SQLite, no need for file-based request queues
+  // Disable persistent storage — our data lives in PostgreSQL, no need for file-based request queues
   Configuration.getGlobalConfig().set('persistStorage', false);
 
   const db = getDb();
@@ -193,7 +196,7 @@ async function crawlDetailOnly(
     .from(listings)
     .where(eq(listings.detailCrawled, false));
 
-  const uncrawled = await query.all();
+  const uncrawled = await query;
 
   // Filter by category/subcategory if specified
   let filtered = uncrawled;
@@ -202,7 +205,7 @@ async function crawlDetailOnly(
       .select({ adId: listings.adId, url: listings.url, category: listings.category, subcategory: listings.subcategory })
       .from(listings)
       .where(eq(listings.detailCrawled, false))
-      .all();
+      ;
 
     filtered = allListings.filter((l) => {
       if (category && l.category !== category) return false;
@@ -236,19 +239,19 @@ async function getCrawlStats(db: ReturnType<typeof getDb>, crawlRunId: number, s
   const [totalResult] = await db
     .select({ count: sql<number>`count(*)` })
     .from(listings)
-    .all();
+    ;
 
   const [newResult] = await db
     .select({ count: sql<number>`count(*)` })
     .from(listings)
     .where(sql`${listings.firstSeenAt} >= ${startedAt}`)
-    .all();
+    ;
 
   const [detailResult] = await db
     .select({ count: sql<number>`count(*)` })
     .from(listings)
-    .where(sql`${listings.updatedAt} >= ${startedAt} AND ${listings.detailCrawled} = 1`)
-    .all();
+    .where(sql`${listings.updatedAt} >= ${startedAt} AND ${listings.detailCrawled} = true`)
+    ;
 
   return {
     listingsFound: totalResult?.count || 0,

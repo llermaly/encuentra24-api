@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
   const total = countResult[0].count;
 
   return NextResponse.json({
-    data: rows.map(r => ({
+    data: rows.map((r: any) => ({
       ...r,
       isFavorite: r.isFavorite === 1,
       images: Array.isArray(r.images) ? r.images : [],

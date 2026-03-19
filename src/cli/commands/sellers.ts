@@ -24,8 +24,7 @@ async function syncSellers() {
     })
     .from(listings)
     .where(sql`${listings.sellerName} IS NOT NULL AND ${listings.sellerName} != ''`)
-    .groupBy(listings.sellerName)
-    .all();
+    .groupBy(listings.sellerName);
 
   let inserted = 0;
   let updated = 0;
@@ -35,7 +34,7 @@ async function syncSellers() {
       .select({ id: sellers.id })
       .from(sellers)
       .where(eq(sellers.name, s.name!))
-      .get();
+      .then(r => r[0]);
 
     if (!existing) {
       await db.insert(sellers).values({
@@ -59,7 +58,7 @@ async function syncSellers() {
   console.log(`Sellers synced: ${inserted} new, ${updated} updated (${uniqueSellers.length} total)`);
 
   // Link listings to sellers via seller_id
-  const allSellers = await db.select({ id: sellers.id, name: sellers.name }).from(sellers).all();
+  const allSellers = await db.select({ id: sellers.id, name: sellers.name }).from(sellers);
   const sellerMap = new Map(allSellers.map(s => [s.name, s.id]));
 
   let linked = 0;
@@ -67,7 +66,7 @@ async function syncSellers() {
     const result = await db.update(listings)
       .set({ sellerId })
       .where(sql`${listings.sellerName} = ${name} AND (${listings.sellerId} IS NULL OR ${listings.sellerId} != ${sellerId})`);
-    linked += result.rowsAffected;
+    linked += (result as any).rowCount ?? 0;
   }
 
   console.log(`Linked ${linked} listings to sellers`);
@@ -87,8 +86,7 @@ async function crawlSellerContacts() {
       sampleListingUrl: sellers.sampleListingUrl,
     })
     .from(sellers)
-    .where(sql`${sellers.whatsapp} IS NULL AND ${sellers.sampleListingUrl} IS NOT NULL`)
-    .all();
+    .where(sql`${sellers.whatsapp} IS NULL AND ${sellers.sampleListingUrl} IS NOT NULL`);
 
   if (pending.length === 0) {
     console.log('All sellers already have contact info.');
@@ -202,15 +200,14 @@ export const sellersCommand = new Command('sellers')
       .description('Show seller statistics')
       .action(async () => {
         const db = getDb();
-        const total = await db.select({ count: sql<number>`count(*)` }).from(sellers).all();
-        const withWa = await db.select({ count: sql<number>`count(*)` }).from(sellers).where(sql`${sellers.whatsapp} IS NOT NULL AND ${sellers.whatsapp} != ''`).all();
-        const pending = await db.select({ count: sql<number>`count(*)` }).from(sellers).where(isNull(sellers.whatsapp)).all();
+        const total = await db.select({ count: sql<number>`count(*)` }).from(sellers);
+        const withWa = await db.select({ count: sql<number>`count(*)` }).from(sellers).where(sql`${sellers.whatsapp} IS NOT NULL AND ${sellers.whatsapp} != ''`);
+        const pending = await db.select({ count: sql<number>`count(*)` }).from(sellers).where(isNull(sellers.whatsapp));
         const topSellers = await db
           .select({ name: sellers.name, whatsapp: sellers.whatsapp, listingCount: sellers.listingCount })
           .from(sellers)
           .orderBy(sql`${sellers.listingCount} DESC`)
-          .limit(15)
-          .all();
+          .limit(15);
 
         console.log(`\n=== Seller Stats ===`);
         console.log(`Total sellers: ${total[0].count}`);

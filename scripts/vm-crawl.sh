@@ -45,9 +45,14 @@ su - gustavo -c "cd $WORKDIR && git pull origin main" >> "$LOGFILE" 2>&1 || true
 echo "[$(date)] Checking dependencies..." >> "$LOGFILE" 2>&1
 su - gustavo -c "cd $WORKDIR && npm install --omit=dev" >> "$LOGFILE" 2>&1 || true
 
+# Database URL from VM metadata (set via gcloud compute instances add-metadata)
+DATABASE_URL=$(curl -sf -H "Metadata-Flavor: Google" \
+  "http://metadata.google.internal/computeMetadata/v1/instance/attributes/database-url" 2>/dev/null || echo "")
+export DATABASE_URL
+
 # Run crawl as gustavo user
 echo "[$(date)] Running crawl..." >> "$LOGFILE" 2>&1
-su - gustavo -c "cd $WORKDIR && npx tsx src/index.ts crawl $CRAWL_ARGS" >> "$LOGFILE" 2>&1 || true
+su - gustavo -c "cd $WORKDIR && DATABASE_URL='$DATABASE_URL' timeout 7200 npx tsx src/index.ts crawl $CRAWL_ARGS" >> "$LOGFILE" 2>&1 || true
 EXIT_CODE=$?
 
 echo "[$(date)] Crawl finished with exit code $EXIT_CODE" >> "$LOGFILE" 2>&1

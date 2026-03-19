@@ -22,15 +22,19 @@ export default function AgentReportPage({ params }: AgentReportPageProps) {
   const { name } = use(params);
   const sellerName = decodeURIComponent(name);
   const [listingsPage, setListingsPage] = useState(1);
+  const [listingsLocation, setListingsLocation] = useState('');
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['agent-report', sellerName, listingsPage],
-    queryFn: () =>
-      fetch(`/api/agents/${encodeURIComponent(sellerName)}?listingsPage=${listingsPage}`)
+    queryKey: ['agent-report', sellerName, listingsPage, listingsLocation],
+    queryFn: () => {
+      const params = new URLSearchParams({ listingsPage: String(listingsPage) });
+      if (listingsLocation) params.set('listingsLocation', listingsLocation);
+      return fetch(`/api/agents/${encodeURIComponent(sellerName)}?${params}`)
         .then(r => {
           if (!r.ok) throw new Error('Agent not found');
           return r.json();
-        }),
+        });
+    },
   });
 
   if (isLoading) {
@@ -62,7 +66,7 @@ export default function AgentReportPage({ params }: AgentReportPageProps) {
     );
   }
 
-  const { profile, metrics, portfolio, pricing, position, quality, agents, inventory, geo, listings } = data;
+  const { profile, metrics, portfolio, pricing, position, quality, agents, inventory, geo, listings, listingsLocations } = data;
 
   const typeBadgeColor: Record<string, string> = {
     agency: 'bg-purple-100 text-purple-700',
@@ -139,7 +143,19 @@ export default function AgentReportPage({ params }: AgentReportPageProps) {
         <MetricCard label="Market Rank" value={metrics.rank ? `#${metrics.rank}` : 'N/A'} />
       </div>
 
-      {/* Section 3: Portfolio Breakdown */}
+      {/* Section 3: Listings */}
+      <Section title={`Listings (${listings.pagination.total})`}>
+        <AgentListings
+          listings={listings.data}
+          pagination={listings.pagination}
+          onPageChange={setListingsPage}
+          locations={listingsLocations || []}
+          selectedLocation={listingsLocation}
+          onLocationChange={(loc) => { setListingsLocation(loc); setListingsPage(1); }}
+        />
+      </Section>
+
+      {/* Section 4: Portfolio Breakdown */}
       <Section title="Portfolio Breakdown">
         <PortfolioCharts
           categorySplit={portfolio.categorySplit}
@@ -223,14 +239,6 @@ export default function AgentReportPage({ params }: AgentReportPageProps) {
         <AgentMap listings={geo} />
       </Section>
 
-      {/* Section 9: Listings */}
-      <Section title={`Listings (${listings.pagination.total})`}>
-        <AgentListings
-          listings={listings.data}
-          pagination={listings.pagination}
-          onPageChange={setListingsPage}
-        />
-      </Section>
     </div>
   );
 }

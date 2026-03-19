@@ -3,6 +3,7 @@ import { db } from '@/db';
 import { listings } from '@/db/schema';
 import { sql, eq, and, isNull, isNotNull } from 'drizzle-orm';
 import { requireUser } from '@/lib/auth';
+import { daysSince } from '@/db/sql-helpers';
 
 export async function GET(
   request: NextRequest,
@@ -15,11 +16,17 @@ export async function GET(
   const sellerName = decodeURIComponent(name);
 
   const listingsPage = Math.max(1, Number(request.nextUrl.searchParams.get('listingsPage') || '1'));
+  const listingsLocation = request.nextUrl.searchParams.get('listingsLocation') || '';
   const listingsLimit = 24;
   const listingsOffset = (listingsPage - 1) * listingsLimit;
 
   const activeCond = and(eq(listings.sellerName, sellerName), isNull(listings.removedAt));
+  const listingsCond = listingsLocation
+    ? and(activeCond, eq(listings.location, listingsLocation))
+    : activeCond;
   const allCond = eq(listings.sellerName, sellerName);
+
+  const daysSincePublished = daysSince(listings.publishedAt);
 
   // All queries in parallel
   const [
@@ -41,6 +48,7 @@ export async function GET(
     geoListings,
     agentListings,
     listingsTotal,
+    listingsLocations,
   ] = await Promise.all([
     // 1. Profile info
     db.all<{
@@ -51,8 +59,8 @@ export async function GET(
       total_listings: number;
     }>(sql`
       SELECT
-        seller_name, seller_type,
-        MAX(seller_verified) as seller_verified,
+        MAX(seller_name) as seller_name, MAX(seller_type) as seller_type,
+        MAX(CASE WHEN seller_verified THEN 1 ELSE 0 END) as seller_verified,
         MIN(first_seen_at) as first_seen,
         COUNT(*) as total_listings
       FROM listings
@@ -90,27 +98,28 @@ export async function GET(
 
     // 5. Price range distribution
     db.all<{ range_label: string; count: number; sort_order: number }>(sql`
-      SELECT
-        CASE
-          WHEN ${listings.price} < 100000 THEN '<$100K'
-          WHEN ${listings.price} < 200000 THEN '$100-200K'
-          WHEN ${listings.price} < 300000 THEN '$200-300K'
-          WHEN ${listings.price} < 500000 THEN '$300-500K'
-          WHEN ${listings.price} < 1000000 THEN '$500K-1M'
-          ELSE '$1M+'
-        END as range_label,
-        CASE
-          WHEN ${listings.price} < 100000 THEN 1
-          WHEN ${listings.price} < 200000 THEN 2
-          WHEN ${listings.price} < 300000 THEN 3
-          WHEN ${listings.price} < 500000 THEN 4
-          WHEN ${listings.price} < 1000000 THEN 5
-          ELSE 6
-        END as sort_order,
-        COUNT(*) as count
-      FROM ${listings}
-      WHERE ${listings.sellerName} = ${sellerName} AND ${listings.removedAt} IS NULL AND ${listings.price} IS NOT NULL
-      GROUP BY range_label
+      SELECT range_label, sort_order, COUNT(*) as count FROM (
+        SELECT
+          CASE
+            WHEN ${listings.price} < 100000 THEN '<$100K'
+            WHEN ${listings.price} < 200000 THEN '$100-200K'
+            WHEN ${listings.price} < 300000 THEN '$200-300K'
+            WHEN ${listings.price} < 500000 THEN '$300-500K'
+            WHEN ${listings.price} < 1000000 THEN '$500K-1M'
+            ELSE '$1M+'
+          END as range_label,
+          CASE
+            WHEN ${listings.price} < 100000 THEN 1
+            WHEN ${listings.price} < 200000 THEN 2
+            WHEN ${listings.price} < 300000 THEN 3
+            WHEN ${listings.price} < 500000 THEN 4
+            WHEN ${listings.price} < 1000000 THEN 5
+            ELSE 6
+          END as sort_order
+        FROM ${listings}
+        WHERE ${listings.sellerName} = ${sellerName} AND ${listings.removedAt} IS NULL AND ${listings.price} IS NOT NULL
+      ) sub
+      GROUP BY range_label, sort_order
       ORDER BY sort_order
     `),
 
@@ -177,29 +186,23 @@ export async function GET(
         FROM listings
         WHERE seller_name IS NOT NULL AND removed_at IS NULL
         GROUP BY seller_name
-      ) WHERE seller_name = ${sellerName}
+      ) ranked WHERE seller_name = ${sellerName}
     `),
 
-    // 10. Area positions
+    // 10. Area positions (rank across ALL sellers per location, then filter to this one)
     db.all<{ location: string; rank: number; market_share: number; listing_count: number }>(sql`
-      SELECT
-        location,
-        rank,
-        ROUND(CAST(listing_count AS REAL) / total_in_area * 100, 1) as market_share,
-        listing_count
-      FROM (
+      SELECT location, rank, market_share, listing_count FROM (
         SELECT
+          seller_name,
           location,
           COUNT(*) as listing_count,
-          (SELECT COUNT(*) FROM listings l2 WHERE l2.location = listings.location AND l2.removed_at IS NULL) as total_in_area,
-          RANK() OVER (
-            PARTITION BY location
-            ORDER BY COUNT(*) DESC
-          ) as rank
+          RANK() OVER (PARTITION BY location ORDER BY COUNT(*) DESC) as rank,
+          ROUND((COUNT(*)::numeric / SUM(COUNT(*)) OVER (PARTITION BY location) * 100), 1) as market_share
         FROM listings
-        WHERE seller_name = ${sellerName} AND removed_at IS NULL AND location IS NOT NULL
-        GROUP BY location
-      )
+        WHERE removed_at IS NULL AND location IS NOT NULL AND seller_name IS NOT NULL
+        GROUP BY seller_name, location
+      ) sub
+      WHERE seller_name = ${sellerName}
       ORDER BY listing_count DESC
       LIMIT 10
     `),
@@ -228,11 +231,11 @@ export async function GET(
     }>(sql`
       SELECT
         COALESCE(AVG(favorites_count), 0) as avg_favorites,
-        (SELECT COALESCE(MAX(avg_fav), 1) FROM (SELECT AVG(favorites_count) as avg_fav FROM listings WHERE seller_name IS NOT NULL AND removed_at IS NULL GROUP BY seller_name)) as max_market_favorites,
-        COALESCE(SUM(CASE WHEN feature_level IN ('premium', 'featured') THEN 1 ELSE 0 END) * 100.0 / MAX(COUNT(*), 1), 0) as pct_premium,
+        (SELECT COALESCE(MAX(avg_fav), 1) FROM (SELECT AVG(favorites_count) as avg_fav FROM listings WHERE seller_name IS NOT NULL AND removed_at IS NULL GROUP BY seller_name) sub) as max_market_favorites,
+        COALESCE(SUM(CASE WHEN feature_level IN ('premium', 'featured') THEN 1 ELSE 0 END) * 100.0 / GREATEST(COUNT(*), 1), 0) as pct_premium,
         COALESCE(AVG(image_count), 0) as avg_images,
         COALESCE(
-          SUM(CASE WHEN bedrooms IS NOT NULL AND bathrooms IS NOT NULL AND (built_area_sqm IS NOT NULL OR land_area_sqm IS NOT NULL) AND description IS NOT NULL THEN 1 ELSE 0 END) * 100.0 / MAX(COUNT(*), 1),
+          SUM(CASE WHEN bedrooms IS NOT NULL AND bathrooms IS NOT NULL AND (built_area_sqm IS NOT NULL OR land_area_sqm IS NOT NULL) AND description IS NOT NULL THEN 1 ELSE 0 END) * 100.0 / GREATEST(COUNT(*), 1),
           0
         ) as pct_complete
       FROM listings
@@ -241,23 +244,24 @@ export async function GET(
 
     // 13. Days-on-market distribution
     db.all<{ bucket: string; count: number; sort_order: number }>(sql`
-      SELECT
-        CASE
-          WHEN julianday('now') - julianday(${listings.publishedAt}) < 7 THEN '<7 days'
-          WHEN julianday('now') - julianday(${listings.publishedAt}) < 30 THEN '7-30 days'
-          WHEN julianday('now') - julianday(${listings.publishedAt}) < 90 THEN '30-90 days'
-          ELSE '90+ days'
-        END as bucket,
-        CASE
-          WHEN julianday('now') - julianday(${listings.publishedAt}) < 7 THEN 1
-          WHEN julianday('now') - julianday(${listings.publishedAt}) < 30 THEN 2
-          WHEN julianday('now') - julianday(${listings.publishedAt}) < 90 THEN 3
-          ELSE 4
-        END as sort_order,
-        COUNT(*) as count
-      FROM ${listings}
-      WHERE ${listings.sellerName} = ${sellerName} AND ${listings.removedAt} IS NULL AND ${listings.publishedAt} IS NOT NULL
-      GROUP BY bucket
+      SELECT bucket, sort_order, COUNT(*) as count FROM (
+        SELECT
+          CASE
+            WHEN ${daysSincePublished} < 7 THEN '<7 days'
+            WHEN ${daysSincePublished} < 30 THEN '7-30 days'
+            WHEN ${daysSincePublished} < 90 THEN '30-90 days'
+            ELSE '90+ days'
+          END as bucket,
+          CASE
+            WHEN ${daysSincePublished} < 7 THEN 1
+            WHEN ${daysSincePublished} < 30 THEN 2
+            WHEN ${daysSincePublished} < 90 THEN 3
+            ELSE 4
+          END as sort_order
+        FROM ${listings}
+        WHERE ${listings.sellerName} = ${sellerName} AND ${listings.removedAt} IS NULL AND ${listings.publishedAt} IS NOT NULL
+      ) sub
+      GROUP BY bucket, sort_order
       ORDER BY sort_order
     `),
 
@@ -278,9 +282,9 @@ export async function GET(
     // 14. Inventory status counts
     db.select({
       active: sql<number>`COUNT(CASE WHEN ${listings.removedAt} IS NULL THEN 1 END)`,
-      stale: sql<number>`COUNT(CASE WHEN ${listings.removedAt} IS NULL AND ${listings.publishedAt} IS NOT NULL AND julianday('now') - julianday(${listings.publishedAt}) > 30 THEN 1 END)`,
+      stale: sql<number>`COUNT(CASE WHEN ${listings.removedAt} IS NULL AND ${listings.publishedAt} IS NOT NULL AND ${daysSincePublished} > 30 THEN 1 END)`,
       removed: sql<number>`COUNT(CASE WHEN ${listings.removedAt} IS NOT NULL THEN 1 END)`,
-      avgDom: sql<number>`COALESCE(AVG(CASE WHEN ${listings.removedAt} IS NULL AND ${listings.publishedAt} IS NOT NULL THEN julianday('now') - julianday(${listings.publishedAt}) END), 0)`,
+      avgDom: sql<number>`COALESCE(AVG(CASE WHEN ${listings.removedAt} IS NULL AND ${listings.publishedAt} IS NOT NULL THEN ${daysSincePublished} END), 0)`,
     }).from(listings).where(allCond),
 
     // 15. Geographic listings (for map)
@@ -299,7 +303,7 @@ export async function GET(
       isNotNull(listings.longitude),
     )),
 
-    // 16. Paginated listings for table
+    // 16. Paginated listings for table (filtered by location if set)
     db.select({
       adId: listings.adId,
       title: listings.title,
@@ -314,10 +318,19 @@ export async function GET(
       images: listings.images,
       subcategory: listings.subcategory,
       category: listings.category,
-    }).from(listings).where(activeCond).orderBy(sql`${listings.publishedAt} DESC`).limit(listingsLimit).offset(listingsOffset),
+    }).from(listings).where(listingsCond).orderBy(sql`${listings.publishedAt} DESC`).limit(listingsLimit).offset(listingsOffset),
 
-    // 17. Total listings count for pagination
-    db.select({ total: sql<number>`COUNT(*)` }).from(listings).where(activeCond),
+    // 17. Total listings count for pagination (filtered by location if set)
+    db.select({ total: sql<number>`COUNT(*)` }).from(listings).where(listingsCond),
+
+    // 18. Distinct locations for this seller (for filter dropdown)
+    db.all<{ location: string; count: number }>(sql`
+      SELECT location, COUNT(*) as count
+      FROM listings
+      WHERE seller_name = ${sellerName} AND removed_at IS NULL AND location IS NOT NULL
+      GROUP BY location
+      ORDER BY count DESC
+    `),
   ]);
 
   const profile = profileResult[0];
@@ -382,17 +395,17 @@ export async function GET(
       totalSellers: rank?.total_sellers || null,
     },
     portfolio: {
-      categorySplit: categorySplit.map(r => ({ name: r.category, value: r.count })),
-      subcategorySplit: subcategorySplit.map(r => ({ name: r.subcategory, value: r.count })),
-      priceRanges: priceRanges.map(r => ({ range: r.range_label, count: r.count })),
+      categorySplit: categorySplit.map((r: any) => ({ name: r.category, value: r.count })),
+      subcategorySplit: subcategorySplit.map((r: any) => ({ name: r.subcategory, value: r.count })),
+      priceRanges: priceRanges.map((r: any) => ({ range: r.range_label, count: r.count })),
     },
     pricing: {
-      vsMarket: pricingVsMarket.map(r => ({
+      vsMarket: pricingVsMarket.map((r: any) => ({
         subcategory: r.subcategory,
         agentAvg: Math.round(r.agent_avg),
         marketAvg: Math.round(r.market_avg),
       })),
-      vsMarketSqm: pricePerSqmVsMarket.map(r => ({
+      vsMarketSqm: pricePerSqmVsMarket.map((r: any) => ({
         subcategory: r.subcategory,
         agentAvg: Math.round(r.agent_avg),
         marketAvg: Math.round(r.market_avg),
@@ -405,13 +418,13 @@ export async function GET(
     position: {
       rank: rank?.rank || null,
       totalSellers: rank?.total_sellers || null,
-      areaPositions: areaPositions.map(r => ({
+      areaPositions: areaPositions.map((r: any) => ({
         location: r.location,
         rank: r.rank,
         marketShare: r.market_share,
         listingCount: r.listing_count,
       })),
-      competitors: competitors.map(r => ({
+      competitors: competitors.map((r: any) => ({
         name: r.name,
         overlapListings: r.overlap_listings,
         avgPrice: Math.round(r.avg_price),
@@ -430,20 +443,20 @@ export async function GET(
         pctComplete: Math.round(quality.pct_complete * 10) / 10,
       },
     },
-    agents: agencyAgents.map(a => ({
+    agents: agencyAgents.map((a: any) => ({
       name: a.agent_name,
       listingCount: a.listing_count,
       portfolioValue: a.portfolio_value,
       avgPrice: Math.round(a.avg_price),
     })),
     inventory: {
-      domDistribution: domDistribution.map(r => ({ bucket: r.bucket, count: r.count })),
+      domDistribution: domDistribution.map((r: any) => ({ bucket: r.bucket, count: r.count })),
       active: inventory.active,
       stale: inventory.stale,
       removed: inventory.removed,
       avgDom: Math.round(inventory.avgDom),
     },
-    geo: geoListings.map(r => ({
+    geo: geoListings.map((r: any) => ({
       adId: r.adId,
       title: r.title,
       price: r.price,
@@ -452,8 +465,12 @@ export async function GET(
       lng: r.longitude,
       location: r.location,
     })),
+    listingsLocations: (listingsLocations as any[]).map((l: any) => ({
+      value: l.location,
+      count: Number(l.count),
+    })),
     listings: {
-      data: agentListings.map(r => {
+      data: agentListings.map((r: any) => {
         let thumbnail: string | null = null;
         try {
           const imgs = r.images;

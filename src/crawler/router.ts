@@ -45,7 +45,7 @@ router.addHandler('LIST', async ({ $, request, enqueueLinks, crawler }) => {
       .select({ adId: listings.adId, price: listings.price })
       .from(listings)
       .where(eq(listings.adId, card.adId))
-      .get();
+      .then(r => r[0]);
 
     if (!existing) {
       // New listing — insert
@@ -77,21 +77,24 @@ router.addHandler('LIST', async ({ $, request, enqueueLinks, crawler }) => {
       newCount++;
     } else {
       // Existing listing — check for price change
-      const priceChanged = card.price !== null && existing.price !== card.price;
+      // Use rounding to avoid float noise (e.g. 199743680 vs 199743682)
+      const priceChanged = card.price !== null && existing.price !== null
+        && Math.round(card.price) !== Math.round(existing.price);
 
       if (priceChanged) {
-        // Record price change
+        // Record the OLD price in history before updating
         await db.insert(priceHistory).values({
           adId: card.adId,
-          price: card.price!,
+          price: existing.price!,
           currency: 'USD',
           source: 'crawl',
           recordedAt: now,
         });
 
-        // Update listing and re-enqueue detail
+        // Update listing to the new price and re-enqueue detail
         await db.update(listings)
           .set({
+            oldPrice: existing.price,
             price: card.price,
             lastSeenAt: now,
             updatedAt: now,
@@ -133,7 +136,7 @@ router.addHandler('LIST', async ({ $, request, enqueueLinks, crawler }) => {
       .select({ detailCrawled: listings.detailCrawled })
       .from(listings)
       .where(eq(listings.adId, card.adId))
-      .get();
+      .then(r => r[0]);
 
     if (listing && !listing.detailCrawled) {
       await crawler.addRequests([{
@@ -256,7 +259,7 @@ router.addHandler('DETAIL', async ({ $, request }) => {
       .select({ id: priceHistory.id })
       .from(priceHistory)
       .where(eq(priceHistory.adId, adId))
-      .get();
+      .then(r => r[0]);
 
     if (!existingOldPrice) {
       await db.insert(priceHistory).values({

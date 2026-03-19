@@ -1,7 +1,8 @@
-import { migrate } from 'drizzle-orm/libsql/migrator';
-import { getDb } from './connection.js';
+import { migrate } from 'drizzle-orm/postgres-js/migrator';
+import { initDb, getDb } from './connection.js';
 
 async function runMigrations() {
+  await initDb();
   const db = getDb();
   console.log('Running migrations...');
   await migrate(db, { migrationsFolder: './drizzle' });

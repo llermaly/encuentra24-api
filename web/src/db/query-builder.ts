@@ -1,5 +1,6 @@
 import { and, eq, gte, lte, isNotNull, sql, desc, asc, SQL } from 'drizzle-orm';
 import { listings, favorites, pipelineItems } from './schema';
+import { fullTextSearch } from './sql-helpers';
 import type { ListingFilters } from '@/types/filters';
 import { DEFAULT_PAGE_SIZE } from '@/lib/constants';
 
@@ -7,10 +8,7 @@ export function buildListingWhere(filters: ListingFilters): SQL | undefined {
   const conditions: SQL[] = [];
 
   if (filters.q) {
-    // Use FTS5 virtual table for fast full-text search
-    conditions.push(
-      sql`${listings.adId} IN (SELECT ad_id FROM listings_fts WHERE listings_fts MATCH ${filters.q})`
-    );
+    conditions.push(fullTextSearch(listings.adId, filters.q));
   }
   if (filters.category) conditions.push(eq(listings.category, filters.category));
   if (filters.subcategory) conditions.push(eq(listings.subcategory, filters.subcategory));
@@ -56,7 +54,8 @@ export function buildListingOrderBy(sort?: string) {
     case 'date_desc': return desc(listings.lastSeenAt);
     case 'first_seen_desc': return desc(listings.firstSeenAt);
     case 'published_desc':
-    default: return desc(listings.publishedAt);
+    // publishedAt is date-only (e.g. "2026-03-19"), so use firstSeenAt as tiebreaker
+    default: return sql`${listings.publishedAt} DESC NULLS LAST, ${listings.firstSeenAt} DESC`;
   }
 }
 

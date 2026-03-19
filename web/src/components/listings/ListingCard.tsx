@@ -234,7 +234,7 @@ export function ListingCard({ listing }: ListingCardProps) {
           </div>
           <div className="flex items-center justify-between mt-2">
             <p className="text-xs text-gray-400">
-              {formatRelativeDate(listing.publishedAt || listing.firstSeenAt)}
+              {formatRelativeDate(listing.firstSeenAt)}
             </p>
             {listing.favoritesCount != null && listing.favoritesCount > 0 && (
               <span className="text-xs text-gray-400 flex items-center gap-0.5">

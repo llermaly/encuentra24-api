@@ -17,11 +17,11 @@ export const exportCommand = new Command('export')
     let conditions: string[] = [];
     if (opts.category) conditions.push(`category = '${opts.category}'`);
     if (opts.subcategory) conditions.push(`subcategory = '${opts.subcategory}'`);
-    if (opts.detailOnly) conditions.push(`detail_crawled = 1`);
+    if (opts.detailOnly) conditions.push(`detail_crawled = true`);
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-    const rows = await db.all(sql.raw(`SELECT * FROM listings ${whereClause} ORDER BY id`));
+    const rows = await db.execute(sql.raw(`SELECT * FROM listings ${whereClause} ORDER BY id`)).then(r => (r as any).rows ?? r) as Record<string, unknown>[];
 
     if (rows.length === 0) {
       console.log('No listings found matching criteria.');

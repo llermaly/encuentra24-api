@@ -28,7 +28,7 @@ export async function GET() {
     .leftJoin(listings, eq(pipelineItems.adId, listings.adId))
     .where(eq(pipelineItems.userId, user.id));
 
-  return NextResponse.json(rows.map(r => ({
+  return NextResponse.json(rows.map((r: any) => ({
     ...r,
     thumbnail: Array.isArray(r.images) && r.images.length > 0 ? r.images[0] : null,
     images: undefined,
