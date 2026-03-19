@@ -63,6 +63,7 @@ export const listings = pgTable('listings', {
   removedAt: text('removed_at'),
   updatedAt: text('updated_at').notNull(),
 
+  removalCheckedAt: text('removal_checked_at'),
   detailCrawled: boolean('detail_crawled').default(false),
   crawlVersion: integer('crawl_version').default(1),
 
