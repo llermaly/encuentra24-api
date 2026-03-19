@@ -39,7 +39,7 @@ fi
 
 # Pull latest code
 echo "[$(date)] Pulling latest code..." >> "$LOGFILE" 2>&1
-su - gustavo -c "cd $WORKDIR && git pull origin main" >> "$LOGFILE" 2>&1 || true
+su - gustavo -c "cd $WORKDIR && git checkout -- . && git pull origin main" >> "$LOGFILE" 2>&1 || true
 
 # Install deps if needed
 echo "[$(date)] Checking dependencies..." >> "$LOGFILE" 2>&1
