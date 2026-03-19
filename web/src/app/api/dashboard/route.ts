@@ -51,7 +51,7 @@ export async function GET() {
     .where(eq(savedSearches.userId, user.id));
 
   const savedSearchResults = await Promise.all(
-    userSearches.map(async (search) => {
+    userSearches.map(async (search: typeof savedSearches.$inferSelect) => {
       const filters: ListingFilters = JSON.parse(search.filters);
       const where = buildListingWhere(filters);
 
