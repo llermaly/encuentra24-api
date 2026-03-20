@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { formatPrice, formatDate } from '@/lib/formatters';
+import { formatPrice, formatDate, formatRelativeDate } from '@/lib/formatters';
 
 interface Listing {
   adId: string;
@@ -18,6 +18,7 @@ interface Listing {
   thumbnail: string | null;
   subcategory: string;
   category: string;
+  removedAt: string | null;
 }
 
 interface AgentListingsProps {
@@ -32,21 +33,32 @@ interface AgentListingsProps {
   locations: { value: string; count: number }[];
   selectedLocation: string;
   onLocationChange: (location: string) => void;
+  status: string;
+  onStatusChange: (status: string) => void;
 }
 
-export function AgentListings({ listings, pagination, onPageChange, locations, selectedLocation, onLocationChange }: AgentListingsProps) {
+export function AgentListings({ listings, pagination, onPageChange, locations, selectedLocation, onLocationChange, status, onStatusChange }: AgentListingsProps) {
   return (
     <div>
-      {/* Location filter */}
-      {locations.length > 1 && (
-        <div className="mb-3">
+      {/* Filters */}
+      <div className="flex gap-3 mb-3 items-center">
+        {locations.length > 1 && (
           <LocationFilter
             locations={locations}
             value={selectedLocation}
             onChange={onLocationChange}
           />
-        </div>
-      )}
+        )}
+        <select
+          value={status}
+          onChange={e => onStatusChange(e.target.value)}
+          className="px-3 py-1.5 text-sm border border-gray-300 rounded bg-white text-gray-900"
+        >
+          <option value="active">Active only</option>
+          <option value="removed">Removed only</option>
+          <option value="all">All listings</option>
+        </select>
+      </div>
 
       {listings.length === 0 ? (
         <div className="bg-white rounded-lg border p-8 text-center text-gray-400">
@@ -71,7 +83,7 @@ export function AgentListings({ listings, pagination, onPageChange, locations, s
               </thead>
               <tbody>
                 {listings.map(listing => (
-                  <tr key={listing.adId} className="border-b hover:bg-gray-50 transition-colors">
+                  <tr key={listing.adId} className={`border-b hover:bg-gray-50 transition-colors ${listing.removedAt ? 'opacity-60 bg-red-50' : ''}`}>
                     <td className="px-3 py-2">
                       {listing.thumbnail ? (
                         <img
@@ -87,10 +99,13 @@ export function AgentListings({ listings, pagination, onPageChange, locations, s
                     <td className="px-3 py-2">
                       <Link
                         href={`/listings/${listing.adId}`}
-                        className="text-blue-600 hover:underline line-clamp-1 max-w-[250px] block"
+                        className={`hover:underline line-clamp-1 max-w-[250px] block ${listing.removedAt ? 'text-red-600' : 'text-blue-600'}`}
                       >
                         {listing.title || 'Untitled'}
                       </Link>
+                      {listing.removedAt && (
+                        <span className="text-xs text-red-400">Removed {formatRelativeDate(listing.removedAt)}</span>
+                      )}
                     </td>
                     <td className="px-3 py-2 text-right font-medium whitespace-nowrap">
                       {formatPrice(listing.price, listing.currency || 'USD')}

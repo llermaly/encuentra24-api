@@ -17,13 +17,19 @@ export async function GET(
 
   const listingsPage = Math.max(1, Number(request.nextUrl.searchParams.get('listingsPage') || '1'));
   const listingsLocation = request.nextUrl.searchParams.get('listingsLocation') || '';
+  const listingsStatus = request.nextUrl.searchParams.get('listingsStatus') || 'active';
   const listingsLimit = 24;
   const listingsOffset = (listingsPage - 1) * listingsLimit;
 
+  const statusCond = listingsStatus === 'removed'
+    ? and(eq(listings.sellerName, sellerName), isNotNull(listings.removedAt))
+    : listingsStatus === 'all'
+    ? eq(listings.sellerName, sellerName)
+    : and(eq(listings.sellerName, sellerName), isNull(listings.removedAt));
   const activeCond = and(eq(listings.sellerName, sellerName), isNull(listings.removedAt));
   const listingsCond = listingsLocation
-    ? and(activeCond, eq(listings.location, listingsLocation))
-    : activeCond;
+    ? and(statusCond, eq(listings.location, listingsLocation))
+    : statusCond;
   const allCond = eq(listings.sellerName, sellerName);
 
   const daysSincePublished = daysSince(listings.publishedAt);
@@ -318,6 +324,7 @@ export async function GET(
       images: listings.images,
       subcategory: listings.subcategory,
       category: listings.category,
+      removedAt: listings.removedAt,
     }).from(listings).where(listingsCond).orderBy(sql`${listings.publishedAt} DESC`).limit(listingsLimit).offset(listingsOffset),
 
     // 17. Total listings count for pagination (filtered by location if set)

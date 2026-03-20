@@ -67,6 +67,7 @@ interface CrawlLiveData {
     updatedListings: number;
     detailsCrawled: number;
     errors: number;
+    removed: number;
   };
   price: {
     total: number;
@@ -82,6 +83,21 @@ interface CrawlLiveData {
   newListings: { data: NewListing[]; pagination: Pagination };
   updatedListings: { data: UpdatedListing[]; pagination: Pagination };
   errors: { data: CrawlError[]; pagination: Pagination };
+  removedListings: {
+    data: {
+      adId: string;
+      title: string | null;
+      price: number | null;
+      currency: string | null;
+      location: string | null;
+      category: string;
+      subcategory: string;
+      sellerName: string | null;
+      removedAt: string;
+      lastSeenAt: string;
+    }[];
+    pagination: Pagination;
+  };
 }
 
 function formatDuration(secs: number | null): string {
@@ -120,12 +136,13 @@ function ElapsedTimer({ startedAt, isRunning }: { startedAt: string; isRunning: 
   return <span className="font-mono">{formatDuration(elapsed)}</span>;
 }
 
-type Tab = 'new' | 'updated' | 'sellers' | 'errors';
+type Tab = 'new' | 'updated' | 'removed' | 'sellers' | 'errors';
 
 export function CrawlRunDetail({ runId }: { runId: number }) {
   const [tab, setTab] = useState<Tab>('new');
   const [newPage, setNewPage] = useState(1);
   const [updatedPage, setUpdatedPage] = useState(1);
+  const [removedPage, setRemovedPage] = useState(1);
   const [errorsPage, setErrorsPage] = useState(1);
   const [cancelling, setCancelling] = useState(false);
   const queryClient = useQueryClient();
@@ -146,12 +163,13 @@ export function CrawlRunDetail({ runId }: { runId: number }) {
   }
 
   const { data, isLoading, error } = useQuery<CrawlLiveData>({
-    queryKey: ['crawl-live', runId, newPage, updatedPage, errorsPage],
+    queryKey: ['crawl-live', runId, newPage, updatedPage, removedPage, errorsPage],
     queryFn: async () => {
       const params = new URLSearchParams({
         runId: String(runId),
         newPage: String(newPage),
         updatedPage: String(updatedPage),
+        removedPage: String(removedPage),
         errorsPage: String(errorsPage),
       });
       const res = await fetch(`/api/crawl-live?${params}`);
@@ -186,12 +204,13 @@ export function CrawlRunDetail({ runId }: { runId: number }) {
     );
   }
 
-  const { crawlRun, stats, price, breakdowns, newListings, updatedListings, errors: crawlErrors } = data;
+  const { crawlRun, stats, price, breakdowns, newListings, updatedListings, removedListings, errors: crawlErrors } = data;
   const isRunning = crawlRun.isRunning;
 
-  const tabs: { key: Tab; label: string; count: number }[] = [
+  const tabs: { key: Tab; label: string; count: number; color?: string }[] = [
     { key: 'new', label: 'New Listings', count: stats.newListings },
     { key: 'updated', label: 'Updated', count: stats.updatedListings },
+    { key: 'removed', label: 'Removed', count: stats.removed, color: 'text-red-600' },
     { key: 'sellers', label: 'Sellers', count: breakdowns.sellers.length },
     { key: 'errors', label: 'Errors', count: stats.errors },
   ];
@@ -326,6 +345,7 @@ export function CrawlRunDetail({ runId }: { runId: number }) {
         <div className="p-0">
           {tab === 'new' && <NewListingsTab data={newListings} onPageChange={setNewPage} />}
           {tab === 'updated' && <UpdatedListingsTab data={updatedListings} onPageChange={setUpdatedPage} />}
+          {tab === 'removed' && <RemovedListingsTab data={removedListings} onPageChange={setRemovedPage} />}
           {tab === 'sellers' && <SellersTab sellers={breakdowns.sellers} />}
           {tab === 'errors' && <ErrorsTab data={crawlErrors} onPageChange={setErrorsPage} />}
         </div>
@@ -483,6 +503,40 @@ function SellersTab({ sellers }: { sellers: CrawlLiveData['breakdowns']['sellers
         </Link>
       ))}
     </div>
+  );
+}
+
+function RemovedListingsTab({ data, onPageChange }: { data: CrawlLiveData['removedListings']; onPageChange: (p: number) => void }) {
+  if (data.data.length === 0) {
+    return <div className="p-8 text-center text-gray-500">No removed listings detected</div>;
+  }
+
+  return (
+    <>
+      <div className="divide-y divide-gray-100">
+        {data.data.map((l) => (
+          <Link
+            key={l.adId}
+            href={`/listings/${l.adId}`}
+            className="flex items-center gap-4 px-5 py-3 hover:bg-red-50 transition-colors bg-red-50/30"
+          >
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-red-700 truncate">{l.title || l.adId}</p>
+              <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
+                <span>{l.subcategory}</span>
+                {l.location && <><span>&middot;</span><span>{l.location}</span></>}
+                {l.sellerName && <><span>&middot;</span><span>{l.sellerName}</span></>}
+              </div>
+            </div>
+            <div className="text-right flex-shrink-0">
+              <p className="text-sm font-semibold text-gray-900">{formatPrice(l.price)}</p>
+              <p className="text-xs text-red-400">Removed {formatTimeShort(l.removedAt)}</p>
+            </div>
+          </Link>
+        ))}
+      </div>
+      <PaginationControls pagination={data.pagination} onPageChange={onPageChange} />
+    </>
   );
 }
 

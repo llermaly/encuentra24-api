@@ -108,10 +108,11 @@ function SummaryTab() {
   return (
     <div className="space-y-6">
       {/* Stats row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <StatCard label="Active Listings" value={stats.activeListings.toLocaleString()} />
         <StatCard label="New This Week" value={stats.newThisWeek.toLocaleString()} accent />
-        <StatCard label="Avg Price" value={formatCompactPrice(stats.avgPrice)} />
+        <StatCard label="Avg Sale Price" value={formatCompactPrice(stats.avgPriceSale)} />
+        <StatCard label="Avg Rent Price" value={formatCompactPrice(stats.avgPriceRent)} />
         <StatCard label="Active Sellers" value={stats.activeSellers.toLocaleString()} />
       </div>
 

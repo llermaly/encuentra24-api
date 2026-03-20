@@ -23,9 +23,10 @@ export async function GET(request: NextRequest) {
         db.select({ count: sql<number>`count(*)` }).from(listings).where(and(active, gte(listings.firstSeenAt, todayStart))),
         db.select({ count: sql<number>`count(*)` }).from(listings).where(and(active, gte(listings.firstSeenAt, weekAgo))),
         db.select({ count: sql<number>`count(*)` }).from(favorites).where(eq(favorites.userId, user.id)),
-        db.all<{ avg_price: number | null; active_sellers: number }>(sql`
+        db.all<{ avg_price_sale: number | null; avg_price_rent: number | null; active_sellers: number }>(sql`
           SELECT
-            AVG(price) FILTER (WHERE price IS NOT NULL) as avg_price,
+            AVG(price) FILTER (WHERE price IS NOT NULL AND category = 'sale') as avg_price_sale,
+            AVG(price) FILTER (WHERE price IS NOT NULL AND category = 'rental') as avg_price_rent,
             COUNT(DISTINCT seller_name) as active_sellers
           FROM listings WHERE removed_at IS NULL
         `),
@@ -49,7 +50,7 @@ export async function GET(request: NextRequest) {
     ]);
 
     const [totalResult, todayResult, weekResult, favoritesResult, marketResult] = statsResults;
-    const market = (marketResult as any[])[0] ?? { avg_price: null, active_sellers: 0 };
+    const market = (marketResult as any[])[0] ?? { avg_price_sale: null, avg_price_rent: null, active_sellers: 0 };
 
     return NextResponse.json({
       tab: 'summary',
@@ -58,7 +59,8 @@ export async function GET(request: NextRequest) {
         newToday: todayResult[0].count,
         newThisWeek: weekResult[0].count,
         totalFavorites: favoritesResult[0].count,
-        avgPrice: market.avg_price != null ? Number(market.avg_price) : null,
+        avgPriceSale: market.avg_price_sale != null ? Number(market.avg_price_sale) : null,
+        avgPriceRent: market.avg_price_rent != null ? Number(market.avg_price_rent) : null,
         activeSellers: Number(market.active_sellers),
       },
       latestListings: latestListings.map((l: any) => ({

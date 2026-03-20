@@ -23,11 +23,12 @@ export default function AgentReportPage({ params }: AgentReportPageProps) {
   const sellerName = decodeURIComponent(name);
   const [listingsPage, setListingsPage] = useState(1);
   const [listingsLocation, setListingsLocation] = useState('');
+  const [listingsStatus, setListingsStatus] = useState('active');
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['agent-report', sellerName, listingsPage, listingsLocation],
+    queryKey: ['agent-report', sellerName, listingsPage, listingsLocation, listingsStatus],
     queryFn: () => {
-      const params = new URLSearchParams({ listingsPage: String(listingsPage) });
+      const params = new URLSearchParams({ listingsPage: String(listingsPage), listingsStatus });
       if (listingsLocation) params.set('listingsLocation', listingsLocation);
       return fetch(`/api/agents/${encodeURIComponent(sellerName)}?${params}`)
         .then(r => {
@@ -152,6 +153,8 @@ export default function AgentReportPage({ params }: AgentReportPageProps) {
           locations={listingsLocations || []}
           selectedLocation={listingsLocation}
           onLocationChange={(loc) => { setListingsLocation(loc); setListingsPage(1); }}
+          status={listingsStatus}
+          onStatusChange={(s) => { setListingsStatus(s); setListingsPage(1); }}
         />
       </Section>
 

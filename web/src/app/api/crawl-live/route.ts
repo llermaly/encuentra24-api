@@ -34,14 +34,18 @@ export async function GET(request: NextRequest) {
 
   const newWhere = sql`${listings.firstSeenAt} >= ${startedAt} AND ${listings.firstSeenAt} <= ${endedAt}`;
   const updatedWhere = sql`${listings.updatedAt} >= ${startedAt} AND ${listings.updatedAt} <= ${endedAt} AND ${listings.firstSeenAt} < ${startedAt}`;
+  const removedWhere = sql`${listings.removedAt} >= ${startedAt} AND ${listings.removedAt} <= ${endedAt}`;
+  const removedPage = Math.max(1, Number(request.nextUrl.searchParams.get('removedPage') || '1'));
 
   const [
     newCount,
     updatedCount,
     errorCount,
+    removedCount,
     newListings,
     updatedListings,
     errorList,
+    removedListings,
     detailCount,
     categoryCounts,
     locationCounts,
@@ -52,6 +56,7 @@ export async function GET(request: NextRequest) {
     db.select({ count: sql<number>`count(*)` }).from(listings).where(newWhere),
     db.select({ count: sql<number>`count(*)` }).from(listings).where(updatedWhere),
     db.select({ count: sql<number>`count(*)` }).from(crawlErrors).where(eq(crawlErrors.crawlRunId, crawlRun.id)),
+    db.select({ count: sql<number>`count(*)` }).from(listings).where(removedWhere),
 
     // Paginated new listings
     db.select({
@@ -110,6 +115,25 @@ export async function GET(request: NextRequest) {
       .limit(PAGE_SIZE)
       .offset((errorsPage - 1) * PAGE_SIZE),
 
+    // Paginated removed listings
+    db.select({
+      adId: listings.adId,
+      title: listings.title,
+      price: listings.price,
+      currency: listings.currency,
+      location: listings.location,
+      category: listings.category,
+      subcategory: listings.subcategory,
+      sellerName: listings.sellerName,
+      removedAt: listings.removedAt,
+      lastSeenAt: listings.lastSeenAt,
+    })
+      .from(listings)
+      .where(removedWhere)
+      .orderBy(desc(listings.removedAt))
+      .limit(PAGE_SIZE)
+      .offset((removedPage - 1) * PAGE_SIZE),
+
     // Details crawled count
     db.select({ count: sql<number>`count(*)` })
       .from(listings)
@@ -160,6 +184,7 @@ export async function GET(request: NextRequest) {
   const totalNew = newCount[0].count;
   const totalUpdated = updatedCount[0].count;
   const totalErrors = errorCount[0].count;
+  const totalRemoved = removedCount[0].count;
 
   return NextResponse.json({
     crawlRun: {
@@ -172,6 +197,7 @@ export async function GET(request: NextRequest) {
       updatedListings: totalUpdated,
       detailsCrawled: detailCount[0].count,
       errors: totalErrors,
+      removed: totalRemoved,
     },
     price: {
       total: Number(ps.total),
@@ -238,6 +264,21 @@ export async function GET(request: NextRequest) {
         occurredAt: e.occurredAt,
       })),
       pagination: { page: errorsPage, pageSize: PAGE_SIZE, total: totalErrors, totalPages: Math.ceil(totalErrors / PAGE_SIZE) },
+    },
+    removedListings: {
+      data: removedListings.map((l: any) => ({
+        adId: l.adId,
+        title: l.title,
+        price: l.price,
+        currency: l.currency,
+        location: l.location,
+        category: l.category,
+        subcategory: l.subcategory,
+        sellerName: l.sellerName,
+        removedAt: l.removedAt,
+        lastSeenAt: l.lastSeenAt,
+      })),
+      pagination: { page: removedPage, pageSize: PAGE_SIZE, total: totalRemoved, totalPages: Math.ceil(totalRemoved / PAGE_SIZE) },
     },
   });
 }
