@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
   const isRunning = crawlRun.status === 'running';
 
   const [
+    newCount,
     newListings,
     updatedListings,
     detailCount,
@@ -36,6 +37,11 @@ export async function GET(request: NextRequest) {
     sellerCounts,
     priceStats,
   ] = await Promise.all([
+    // Count of new listings
+    db.select({ count: sql<number>`count(*)` })
+      .from(listings)
+      .where(sql`${listings.firstSeenAt} >= ${startedAt} AND ${listings.firstSeenAt} <= ${endedAt}`),
+
     // New listings from this crawl (with detail)
     db.select({
       adId: listings.adId,
@@ -151,7 +157,7 @@ export async function GET(request: NextRequest) {
       isRunning,
     },
     stats: {
-      newListings: newListings.length,
+      newListings: newCount[0].count,
       updatedListings: updatedListings.length,
       detailsCrawled: detailCount[0].count,
       errors: errorList.length,
