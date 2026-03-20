@@ -65,6 +65,7 @@ function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
     completed: 'bg-green-100 text-green-800',
     running: 'bg-yellow-100 text-yellow-800 animate-pulse',
+    cancelled: 'bg-orange-100 text-orange-800',
     failed: 'bg-red-100 text-red-800',
   };
   return (

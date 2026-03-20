@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
@@ -127,6 +127,23 @@ export function CrawlRunDetail({ runId }: { runId: number }) {
   const [newPage, setNewPage] = useState(1);
   const [updatedPage, setUpdatedPage] = useState(1);
   const [errorsPage, setErrorsPage] = useState(1);
+  const [cancelling, setCancelling] = useState(false);
+  const queryClient = useQueryClient();
+
+  async function handleCancel() {
+    if (!confirm('Mark this crawl run as cancelled?')) return;
+    setCancelling(true);
+    try {
+      await fetch('/api/crawl-live', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ runId, action: 'cancel' }),
+      });
+      queryClient.invalidateQueries({ queryKey: ['crawl-live', runId] });
+    } finally {
+      setCancelling(false);
+    }
+  }
 
   const { data, isLoading, error } = useQuery<CrawlLiveData>({
     queryKey: ['crawl-live', runId, newPage, updatedPage, errorsPage],
@@ -193,6 +210,7 @@ export function CrawlRunDetail({ runId }: { runId: number }) {
               <span className={`inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium ${
                 isRunning ? 'bg-yellow-100 text-yellow-800 animate-pulse' :
                 crawlRun.status === 'completed' ? 'bg-green-100 text-green-800' :
+                crawlRun.status === 'cancelled' ? 'bg-orange-100 text-orange-800' :
                 'bg-red-100 text-red-800'
               }`}>
                 {isRunning && (
@@ -217,6 +235,15 @@ export function CrawlRunDetail({ runId }: { runId: number }) {
               {isRunning && <span className="text-yellow-600 ml-1">(polling every 5s)</span>}
             </p>
           </div>
+          {isRunning && (
+            <button
+              onClick={handleCancel}
+              disabled={cancelling}
+              className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 flex-shrink-0"
+            >
+              {cancelling ? 'Cancelling...' : 'Cancel Run'}
+            </button>
+          )}
         </div>
       </div>
 

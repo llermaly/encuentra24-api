@@ -241,3 +241,43 @@ export async function GET(request: NextRequest) {
     },
   });
 }
+
+export async function POST(request: NextRequest) {
+  await requireUser();
+
+  const body = await request.json();
+  const { runId, action } = body;
+
+  if (!runId || action !== 'cancel') {
+    return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+  }
+
+  const [crawlRun] = await db
+    .select({ id: crawlRuns.id, status: crawlRuns.status, startedAt: crawlRuns.startedAt })
+    .from(crawlRuns)
+    .where(eq(crawlRuns.id, Number(runId)))
+    .limit(1);
+
+  if (!crawlRun) {
+    return NextResponse.json({ error: 'Crawl run not found' }, { status: 404 });
+  }
+
+  if (crawlRun.status !== 'running') {
+    return NextResponse.json({ error: 'Crawl run is not running' }, { status: 400 });
+  }
+
+  const now = new Date().toISOString();
+  const durationSecs = Math.round(
+    (new Date(now).getTime() - new Date(crawlRun.startedAt).getTime()) / 1000
+  );
+
+  await db.update(crawlRuns)
+    .set({
+      status: 'cancelled',
+      finishedAt: now,
+      durationSecs,
+    })
+    .where(eq(crawlRuns.id, Number(runId)));
+
+  return NextResponse.json({ success: true });
+}
