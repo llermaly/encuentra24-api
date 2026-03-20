@@ -4,6 +4,52 @@ import { useQuery } from '@tanstack/react-query';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
+interface Pagination {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
+interface NewListing {
+  adId: string;
+  title: string | null;
+  price: number | null;
+  currency: string | null;
+  location: string | null;
+  province: string | null;
+  city: string | null;
+  category: string;
+  subcategory: string;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  area: number | null;
+  sellerName: string | null;
+  thumbnail: string | null;
+  firstSeenAt: string;
+}
+
+interface UpdatedListing {
+  adId: string;
+  title: string | null;
+  price: number | null;
+  currency: string | null;
+  location: string | null;
+  category: string;
+  subcategory: string;
+  sellerName: string | null;
+  detailCrawled: boolean;
+  updatedAt: string;
+}
+
+interface CrawlError {
+  url: string;
+  type: string;
+  statusCode: number | null;
+  message: string | null;
+  occurredAt: string;
+}
+
 interface CrawlLiveData {
   crawlRun: {
     id: number;
@@ -15,11 +61,6 @@ interface CrawlLiveData {
     finishedAt: string | null;
     elapsedSecs: number;
     isRunning: boolean;
-    listingsNew: number;
-    listingsUpdated: number;
-    detailsCrawled: number;
-    errors: number;
-    durationSecs: number | null;
   };
   stats: {
     newListings: number;
@@ -38,42 +79,9 @@ interface CrawlLiveData {
     locations: { location: string; count: number }[];
     sellers: { name: string; count: number }[];
   };
-  newListings: {
-    adId: string;
-    title: string | null;
-    price: number | null;
-    currency: string | null;
-    location: string | null;
-    province: string | null;
-    city: string | null;
-    category: string;
-    subcategory: string;
-    bedrooms: number | null;
-    bathrooms: number | null;
-    area: number | null;
-    sellerName: string | null;
-    thumbnail: string | null;
-    firstSeenAt: string;
-  }[];
-  updatedListings: {
-    adId: string;
-    title: string | null;
-    price: number | null;
-    currency: string | null;
-    location: string | null;
-    category: string;
-    subcategory: string;
-    sellerName: string | null;
-    detailCrawled: boolean;
-    updatedAt: string;
-  }[];
-  errors: {
-    url: string;
-    type: string;
-    statusCode: number | null;
-    message: string | null;
-    occurredAt: string;
-  }[];
+  newListings: { data: NewListing[]; pagination: Pagination };
+  updatedListings: { data: UpdatedListing[]; pagination: Pagination };
+  errors: { data: CrawlError[]; pagination: Pagination };
 }
 
 function formatDuration(secs: number | null): string {
@@ -116,11 +124,20 @@ type Tab = 'new' | 'updated' | 'sellers' | 'errors';
 
 export function CrawlRunDetail({ runId }: { runId: number }) {
   const [tab, setTab] = useState<Tab>('new');
+  const [newPage, setNewPage] = useState(1);
+  const [updatedPage, setUpdatedPage] = useState(1);
+  const [errorsPage, setErrorsPage] = useState(1);
 
   const { data, isLoading, error } = useQuery<CrawlLiveData>({
-    queryKey: ['crawl-live', runId],
+    queryKey: ['crawl-live', runId, newPage, updatedPage, errorsPage],
     queryFn: async () => {
-      const res = await fetch(`/api/crawl-live?runId=${runId}`);
+      const params = new URLSearchParams({
+        runId: String(runId),
+        newPage: String(newPage),
+        updatedPage: String(updatedPage),
+        errorsPage: String(errorsPage),
+      });
+      const res = await fetch(`/api/crawl-live?${params}`);
       if (!res.ok) throw new Error('Failed to fetch');
       return res.json();
     },
@@ -213,7 +230,6 @@ export function CrawlRunDetail({ runId }: { runId: number }) {
 
       {/* Price + Breakdowns row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        {/* Price summary */}
         {price.total > 0 && (
           <div className="bg-white rounded-lg shadow p-4">
             <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Price Summary</h3>
@@ -226,7 +242,6 @@ export function CrawlRunDetail({ runId }: { runId: number }) {
           </div>
         )}
 
-        {/* Categories */}
         {breakdowns.categories.length > 0 && (
           <div className="bg-white rounded-lg shadow p-4">
             <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Categories</h3>
@@ -241,7 +256,6 @@ export function CrawlRunDetail({ runId }: { runId: number }) {
           </div>
         )}
 
-        {/* Locations */}
         {breakdowns.locations.length > 0 && (
           <div className="bg-white rounded-lg shadow p-4">
             <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Top Locations</h3>
@@ -283,10 +297,10 @@ export function CrawlRunDetail({ runId }: { runId: number }) {
         </div>
 
         <div className="p-0">
-          {tab === 'new' && <NewListingsTab listings={newListings} />}
-          {tab === 'updated' && <UpdatedListingsTab listings={updatedListings} />}
+          {tab === 'new' && <NewListingsTab data={newListings} onPageChange={setNewPage} />}
+          {tab === 'updated' && <UpdatedListingsTab data={updatedListings} onPageChange={setUpdatedPage} />}
           {tab === 'sellers' && <SellersTab sellers={breakdowns.sellers} />}
-          {tab === 'errors' && <ErrorsTab errors={crawlErrors} />}
+          {tab === 'errors' && <ErrorsTab data={crawlErrors} onPageChange={setErrorsPage} />}
         </div>
       </div>
     </div>
@@ -302,89 +316,115 @@ function StatCard({ label, value, color }: { label: string; value: number; color
   );
 }
 
-function NewListingsTab({ listings }: { listings: CrawlLiveData['newListings'] }) {
-  if (listings.length === 0) {
-    return <div className="p-8 text-center text-gray-500">No new listings yet</div>;
-  }
-
+function PaginationControls({ pagination, onPageChange }: { pagination: Pagination; onPageChange: (p: number) => void }) {
+  if (pagination.totalPages <= 1) return null;
   return (
-    <div className="divide-y divide-gray-100">
-      {listings.map((l) => (
-        <Link
-          key={l.adId}
-          href={`/listings/${l.adId}`}
-          className="flex items-center gap-4 px-5 py-3 hover:bg-gray-50 transition-colors"
+    <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100">
+      <span className="text-xs text-gray-500">
+        Page {pagination.page} of {pagination.totalPages} ({pagination.total} total)
+      </span>
+      <div className="flex gap-2">
+        <button
+          onClick={() => onPageChange(pagination.page - 1)}
+          disabled={pagination.page <= 1}
+          className="px-2.5 py-1 text-xs bg-white border rounded disabled:opacity-50 hover:bg-gray-50"
         >
-          {/* Thumbnail */}
-          <div className="w-16 h-12 flex-shrink-0 rounded bg-gray-100 overflow-hidden">
-            {l.thumbnail ? (
-              <img src={l.thumbnail} alt="" className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-gray-300">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" /></svg>
-              </div>
-            )}
-          </div>
-
-          {/* Info */}
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 truncate">{l.title || l.adId}</p>
-            <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
-              <span>{l.subcategory}</span>
-              {l.location && <><span>&middot;</span><span>{l.location}</span></>}
-              {l.sellerName && <><span>&middot;</span><span>{l.sellerName}</span></>}
-            </div>
-          </div>
-
-          {/* Specs */}
-          <div className="hidden md:flex items-center gap-3 text-xs text-gray-500 flex-shrink-0">
-            {l.bedrooms !== null && <span>{l.bedrooms}bd</span>}
-            {l.bathrooms !== null && <span>{l.bathrooms}ba</span>}
-            {l.area !== null && <span>{l.area}m²</span>}
-          </div>
-
-          {/* Price */}
-          <div className="text-right flex-shrink-0">
-            <p className="text-sm font-semibold text-gray-900">{formatPrice(l.price)}</p>
-            <p className="text-xs text-gray-400">{formatTimeShort(l.firstSeenAt)}</p>
-          </div>
-        </Link>
-      ))}
+          Prev
+        </button>
+        <button
+          onClick={() => onPageChange(pagination.page + 1)}
+          disabled={pagination.page >= pagination.totalPages}
+          className="px-2.5 py-1 text-xs bg-white border rounded disabled:opacity-50 hover:bg-gray-50"
+        >
+          Next
+        </button>
+      </div>
     </div>
   );
 }
 
-function UpdatedListingsTab({ listings }: { listings: CrawlLiveData['updatedListings'] }) {
-  if (listings.length === 0) {
+function NewListingsTab({ data, onPageChange }: { data: CrawlLiveData['newListings']; onPageChange: (p: number) => void }) {
+  if (data.data.length === 0) {
+    return <div className="p-8 text-center text-gray-500">No new listings yet</div>;
+  }
+
+  return (
+    <>
+      <div className="divide-y divide-gray-100">
+        {data.data.map((l) => (
+          <Link
+            key={l.adId}
+            href={`/listings/${l.adId}`}
+            className="flex items-center gap-4 px-5 py-3 hover:bg-gray-50 transition-colors"
+          >
+            <div className="w-16 h-12 flex-shrink-0 rounded bg-gray-100 overflow-hidden">
+              {l.thumbnail ? (
+                <img src={l.thumbnail} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-gray-300">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" /></svg>
+                </div>
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-900 truncate">{l.title || l.adId}</p>
+              <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
+                <span>{l.subcategory}</span>
+                {l.location && <><span>&middot;</span><span>{l.location}</span></>}
+                {l.sellerName && <><span>&middot;</span><span>{l.sellerName}</span></>}
+              </div>
+            </div>
+            <div className="hidden md:flex items-center gap-3 text-xs text-gray-500 flex-shrink-0">
+              {l.bedrooms !== null && <span>{l.bedrooms}bd</span>}
+              {l.bathrooms !== null && <span>{l.bathrooms}ba</span>}
+              {l.area !== null && <span>{l.area}m²</span>}
+            </div>
+            <div className="text-right flex-shrink-0">
+              <p className="text-sm font-semibold text-gray-900">{formatPrice(l.price)}</p>
+              <p className="text-xs text-gray-400">{formatTimeShort(l.firstSeenAt)}</p>
+            </div>
+          </Link>
+        ))}
+      </div>
+      <PaginationControls pagination={data.pagination} onPageChange={onPageChange} />
+    </>
+  );
+}
+
+function UpdatedListingsTab({ data, onPageChange }: { data: CrawlLiveData['updatedListings']; onPageChange: (p: number) => void }) {
+  if (data.data.length === 0) {
     return <div className="p-8 text-center text-gray-500">No updated listings yet</div>;
   }
 
   return (
-    <div className="divide-y divide-gray-100">
-      {listings.map((l) => (
-        <Link
-          key={l.adId}
-          href={`/listings/${l.adId}`}
-          className="flex items-center gap-4 px-5 py-3 hover:bg-gray-50 transition-colors"
-        >
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 truncate">{l.title || l.adId}</p>
-            <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
-              <span>{l.subcategory}</span>
-              {l.location && <><span>&middot;</span><span>{l.location}</span></>}
-              {l.sellerName && <><span>&middot;</span><span>{l.sellerName}</span></>}
+    <>
+      <div className="divide-y divide-gray-100">
+        {data.data.map((l) => (
+          <Link
+            key={l.adId}
+            href={`/listings/${l.adId}`}
+            className="flex items-center gap-4 px-5 py-3 hover:bg-gray-50 transition-colors"
+          >
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-900 truncate">{l.title || l.adId}</p>
+              <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
+                <span>{l.subcategory}</span>
+                {l.location && <><span>&middot;</span><span>{l.location}</span></>}
+                {l.sellerName && <><span>&middot;</span><span>{l.sellerName}</span></>}
+              </div>
             </div>
-          </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {l.detailCrawled && (
-              <span className="px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-700">detail</span>
-            )}
-            <span className="text-sm font-semibold text-gray-900">{formatPrice(l.price)}</span>
-            <span className="text-xs text-gray-400">{formatTimeShort(l.updatedAt)}</span>
-          </div>
-        </Link>
-      ))}
-    </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {l.detailCrawled && (
+                <span className="px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-700">detail</span>
+              )}
+              <span className="text-sm font-semibold text-gray-900">{formatPrice(l.price)}</span>
+              <span className="text-xs text-gray-400">{formatTimeShort(l.updatedAt)}</span>
+            </div>
+          </Link>
+        ))}
+      </div>
+      <PaginationControls pagination={data.pagination} onPageChange={onPageChange} />
+    </>
   );
 }
 
@@ -419,29 +459,32 @@ function SellersTab({ sellers }: { sellers: CrawlLiveData['breakdowns']['sellers
   );
 }
 
-function ErrorsTab({ errors }: { errors: CrawlLiveData['errors'] }) {
-  if (errors.length === 0) {
+function ErrorsTab({ data, onPageChange }: { data: CrawlLiveData['errors']; onPageChange: (p: number) => void }) {
+  if (data.data.length === 0) {
     return <div className="p-8 text-center text-gray-500">No errors</div>;
   }
 
   return (
-    <div className="divide-y divide-gray-100">
-      {errors.map((e, i) => (
-        <div key={i} className="px-5 py-3">
-          <div className="flex items-center gap-2 mb-1">
-            <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
-              e.type === 'blocked' ? 'bg-red-100 text-red-700' :
-              e.type === 'http_error' ? 'bg-orange-100 text-orange-700' :
-              'bg-gray-100 text-gray-700'
-            }`}>
-              {e.type}{e.statusCode ? ` ${e.statusCode}` : ''}
-            </span>
-            <span className="text-xs text-gray-400">{formatTimeShort(e.occurredAt)}</span>
+    <>
+      <div className="divide-y divide-gray-100">
+        {data.data.map((e, i) => (
+          <div key={i} className="px-5 py-3">
+            <div className="flex items-center gap-2 mb-1">
+              <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
+                e.type === 'blocked' ? 'bg-red-100 text-red-700' :
+                e.type === 'http_error' ? 'bg-orange-100 text-orange-700' :
+                'bg-gray-100 text-gray-700'
+              }`}>
+                {e.type}{e.statusCode ? ` ${e.statusCode}` : ''}
+              </span>
+              <span className="text-xs text-gray-400">{formatTimeShort(e.occurredAt)}</span>
+            </div>
+            <p className="text-sm text-gray-700 truncate">{e.url}</p>
+            {e.message && <p className="text-xs text-gray-500 truncate mt-0.5">{e.message}</p>}
           </div>
-          <p className="text-sm text-gray-700 truncate">{e.url}</p>
-          {e.message && <p className="text-xs text-gray-500 truncate mt-0.5">{e.message}</p>}
-        </div>
-      ))}
-    </div>
+        ))}
+      </div>
+      <PaginationControls pagination={data.pagination} onPageChange={onPageChange} />
+    </>
   );
 }

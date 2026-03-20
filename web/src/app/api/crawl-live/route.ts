@@ -4,6 +4,8 @@ import { crawlRuns, listings, crawlErrors, sellers } from '@/db/schema';
 import { sql, eq, desc } from 'drizzle-orm';
 import { requireUser } from '@/lib/auth';
 
+const PAGE_SIZE = 10;
+
 export async function GET(request: NextRequest) {
   await requireUser();
 
@@ -11,6 +13,10 @@ export async function GET(request: NextRequest) {
   if (!runId) {
     return NextResponse.json({ error: 'runId required' }, { status: 400 });
   }
+
+  const newPage = Math.max(1, Number(request.nextUrl.searchParams.get('newPage') || '1'));
+  const updatedPage = Math.max(1, Number(request.nextUrl.searchParams.get('updatedPage') || '1'));
+  const errorsPage = Math.max(1, Number(request.nextUrl.searchParams.get('errorsPage') || '1'));
 
   const [crawlRun] = await db
     .select()
@@ -26,23 +32,28 @@ export async function GET(request: NextRequest) {
   const endedAt = crawlRun.finishedAt || new Date().toISOString();
   const isRunning = crawlRun.status === 'running';
 
+  const newWhere = sql`${listings.firstSeenAt} >= ${startedAt} AND ${listings.firstSeenAt} <= ${endedAt}`;
+  const updatedWhere = sql`${listings.updatedAt} >= ${startedAt} AND ${listings.updatedAt} <= ${endedAt} AND ${listings.firstSeenAt} < ${startedAt}`;
+
   const [
     newCount,
+    updatedCount,
+    errorCount,
     newListings,
     updatedListings,
-    detailCount,
     errorList,
+    detailCount,
     categoryCounts,
     locationCounts,
     sellerCounts,
     priceStats,
   ] = await Promise.all([
-    // Count of new listings
-    db.select({ count: sql<number>`count(*)` })
-      .from(listings)
-      .where(sql`${listings.firstSeenAt} >= ${startedAt} AND ${listings.firstSeenAt} <= ${endedAt}`),
+    // Counts
+    db.select({ count: sql<number>`count(*)` }).from(listings).where(newWhere),
+    db.select({ count: sql<number>`count(*)` }).from(listings).where(updatedWhere),
+    db.select({ count: sql<number>`count(*)` }).from(crawlErrors).where(eq(crawlErrors.crawlRunId, crawlRun.id)),
 
-    // New listings from this crawl (with detail)
+    // Paginated new listings
     db.select({
       adId: listings.adId,
       title: listings.title,
@@ -61,11 +72,12 @@ export async function GET(request: NextRequest) {
       firstSeenAt: listings.firstSeenAt,
     })
       .from(listings)
-      .where(sql`${listings.firstSeenAt} >= ${startedAt} AND ${listings.firstSeenAt} <= ${endedAt}`)
+      .where(newWhere)
       .orderBy(desc(listings.firstSeenAt))
-      .limit(100),
+      .limit(PAGE_SIZE)
+      .offset((newPage - 1) * PAGE_SIZE),
 
-    // Updated listings (existed before but price changed or detail crawled)
+    // Paginated updated listings
     db.select({
       adId: listings.adId,
       title: listings.title,
@@ -79,16 +91,12 @@ export async function GET(request: NextRequest) {
       updatedAt: listings.updatedAt,
     })
       .from(listings)
-      .where(sql`${listings.updatedAt} >= ${startedAt} AND ${listings.updatedAt} <= ${endedAt} AND ${listings.firstSeenAt} < ${startedAt}`)
+      .where(updatedWhere)
       .orderBy(desc(listings.updatedAt))
-      .limit(50),
+      .limit(PAGE_SIZE)
+      .offset((updatedPage - 1) * PAGE_SIZE),
 
-    // Details crawled count
-    db.select({ count: sql<number>`count(*)` })
-      .from(listings)
-      .where(sql`${listings.updatedAt} >= ${startedAt} AND ${listings.updatedAt} <= ${endedAt} AND ${listings.detailCrawled} = true`),
-
-    // Errors for this run
+    // Paginated errors
     db.select({
       url: crawlErrors.url,
       errorType: crawlErrors.errorType,
@@ -99,9 +107,15 @@ export async function GET(request: NextRequest) {
       .from(crawlErrors)
       .where(eq(crawlErrors.crawlRunId, crawlRun.id))
       .orderBy(desc(crawlErrors.occurredAt))
-      .limit(50),
+      .limit(PAGE_SIZE)
+      .offset((errorsPage - 1) * PAGE_SIZE),
 
-    // Breakdown by category
+    // Details crawled count
+    db.select({ count: sql<number>`count(*)` })
+      .from(listings)
+      .where(sql`${listings.updatedAt} >= ${startedAt} AND ${listings.updatedAt} <= ${endedAt} AND ${listings.detailCrawled} = true`),
+
+    // Breakdowns
     db.all(sql`
       SELECT category, subcategory, COUNT(*) as count
       FROM listings
@@ -109,8 +123,6 @@ export async function GET(request: NextRequest) {
       GROUP BY category, subcategory
       ORDER BY count DESC
     `),
-
-    // Breakdown by location
     db.all(sql`
       SELECT COALESCE(location, province, 'Unknown') as location, COUNT(*) as count
       FROM listings
@@ -119,8 +131,6 @@ export async function GET(request: NextRequest) {
       ORDER BY count DESC
       LIMIT 15
     `),
-
-    // Sellers discovered/updated
     db.all(sql`
       SELECT seller_name, COUNT(*) as count
       FROM listings
@@ -130,8 +140,6 @@ export async function GET(request: NextRequest) {
       ORDER BY count DESC
       LIMIT 20
     `),
-
-    // Price stats of new listings
     db.all(sql`
       SELECT
         COUNT(*) as total,
@@ -149,6 +157,9 @@ export async function GET(request: NextRequest) {
   );
 
   const ps = (priceStats as any[])[0] || { total: 0, avg_price: 0, min_price: 0, max_price: 0 };
+  const totalNew = newCount[0].count;
+  const totalUpdated = updatedCount[0].count;
+  const totalErrors = errorCount[0].count;
 
   return NextResponse.json({
     crawlRun: {
@@ -157,10 +168,10 @@ export async function GET(request: NextRequest) {
       isRunning,
     },
     stats: {
-      newListings: newCount[0].count,
-      updatedListings: updatedListings.length,
+      newListings: totalNew,
+      updatedListings: totalUpdated,
       detailsCrawled: detailCount[0].count,
-      errors: errorList.length,
+      errors: totalErrors,
     },
     price: {
       total: Number(ps.total),
@@ -183,41 +194,50 @@ export async function GET(request: NextRequest) {
         count: Number(r.count),
       })),
     },
-    newListings: newListings.map((l: any) => ({
-      adId: l.adId,
-      title: l.title,
-      price: l.price,
-      currency: l.currency,
-      location: l.location,
-      province: l.province,
-      city: l.city,
-      category: l.category,
-      subcategory: l.subcategory,
-      bedrooms: l.bedrooms,
-      bathrooms: l.bathrooms,
-      area: l.builtAreaSqm,
-      sellerName: l.sellerName,
-      thumbnail: Array.isArray(l.images) && l.images.length > 0 ? l.images[0] : null,
-      firstSeenAt: l.firstSeenAt,
-    })),
-    updatedListings: updatedListings.map((l: any) => ({
-      adId: l.adId,
-      title: l.title,
-      price: l.price,
-      currency: l.currency,
-      location: l.location,
-      category: l.category,
-      subcategory: l.subcategory,
-      sellerName: l.sellerName,
-      detailCrawled: l.detailCrawled,
-      updatedAt: l.updatedAt,
-    })),
-    errors: errorList.map((e: any) => ({
-      url: e.url,
-      type: e.errorType,
-      statusCode: e.statusCode,
-      message: e.message,
-      occurredAt: e.occurredAt,
-    })),
+    newListings: {
+      data: newListings.map((l: any) => ({
+        adId: l.adId,
+        title: l.title,
+        price: l.price,
+        currency: l.currency,
+        location: l.location,
+        province: l.province,
+        city: l.city,
+        category: l.category,
+        subcategory: l.subcategory,
+        bedrooms: l.bedrooms,
+        bathrooms: l.bathrooms,
+        area: l.builtAreaSqm,
+        sellerName: l.sellerName,
+        thumbnail: Array.isArray(l.images) && l.images.length > 0 ? l.images[0] : null,
+        firstSeenAt: l.firstSeenAt,
+      })),
+      pagination: { page: newPage, pageSize: PAGE_SIZE, total: totalNew, totalPages: Math.ceil(totalNew / PAGE_SIZE) },
+    },
+    updatedListings: {
+      data: updatedListings.map((l: any) => ({
+        adId: l.adId,
+        title: l.title,
+        price: l.price,
+        currency: l.currency,
+        location: l.location,
+        category: l.category,
+        subcategory: l.subcategory,
+        sellerName: l.sellerName,
+        detailCrawled: l.detailCrawled,
+        updatedAt: l.updatedAt,
+      })),
+      pagination: { page: updatedPage, pageSize: PAGE_SIZE, total: totalUpdated, totalPages: Math.ceil(totalUpdated / PAGE_SIZE) },
+    },
+    errors: {
+      data: errorList.map((e: any) => ({
+        url: e.url,
+        type: e.errorType,
+        statusCode: e.statusCode,
+        message: e.message,
+        occurredAt: e.occurredAt,
+      })),
+      pagination: { page: errorsPage, pageSize: PAGE_SIZE, total: totalErrors, totalPages: Math.ceil(totalErrors / PAGE_SIZE) },
+    },
   });
 }
