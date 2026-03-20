@@ -23,6 +23,7 @@ export interface ListingFilters {
   lngMax?: number;
   isFavorite?: boolean;
   inPipeline?: boolean;
+  status?: 'active' | 'removed' | 'all';
   sort?: string;
   page?: number;
   limit?: number;
@@ -65,6 +66,7 @@ export function parseFiltersFromParams(params: URLSearchParams): ListingFilters 
   filters.lngMax = num('lngMax');
   filters.isFavorite = bool('isFavorite');
   filters.inPipeline = bool('inPipeline');
+  filters.status = str('status') as ListingFilters['status'];
   filters.sort = str('sort');
   filters.page = num('page');
   filters.limit = num('limit');

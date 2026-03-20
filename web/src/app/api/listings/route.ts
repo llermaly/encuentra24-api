@@ -9,6 +9,7 @@ import { requireUser } from '@/lib/auth';
 export async function GET(request: NextRequest) {
   const user = await requireUser();
   const filters = parseFiltersFromParams(request.nextUrl.searchParams);
+  if (!filters.status) filters.status = 'active'; // Default to active-only
   const { limit, offset, page } = getPagination(filters);
 
   const where = buildListingWhere(filters);
@@ -44,11 +45,13 @@ export async function GET(request: NextRequest) {
         sellerName: listings.sellerName,
         agentName: listings.agentName,
         sellerType: listings.sellerType,
+        sellerVerified: listings.sellerVerified,
         featureLevel: listings.featureLevel,
         favoritesCount: listings.favoritesCount,
         publishedAt: listings.publishedAt,
         firstSeenAt: listings.firstSeenAt,
         lastSeenAt: listings.lastSeenAt,
+        removedAt: listings.removedAt,
         isFavorite: sql<number>`CASE WHEN ${favorites.id} IS NOT NULL THEN 1 ELSE 0 END`.as('is_favorite'),
         pipelineStage: pipelineItems.stage,
       })

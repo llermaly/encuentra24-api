@@ -1,4 +1,4 @@
-import { and, eq, gte, lte, isNotNull, sql, desc, asc, SQL } from 'drizzle-orm';
+import { and, eq, gte, lte, isNotNull, isNull, sql, desc, asc, SQL } from 'drizzle-orm';
 import { listings, favorites, pipelineItems } from './schema';
 import { fullTextSearch } from './sql-helpers';
 import type { ListingFilters } from '@/types/filters';
@@ -34,6 +34,10 @@ export function buildListingWhere(filters: ListingFilters): SQL | undefined {
   if (filters.latMax != null) conditions.push(lte(listings.latitude, filters.latMax));
   if (filters.lngMin != null) conditions.push(gte(listings.longitude, filters.lngMin));
   if (filters.lngMax != null) conditions.push(lte(listings.longitude, filters.lngMax));
+
+  if (filters.status === 'active') conditions.push(isNull(listings.removedAt));
+  else if (filters.status === 'removed') conditions.push(isNotNull(listings.removedAt));
+  // 'all' = no filter
 
   if (filters.isFavorite) {
     conditions.push(isNotNull(favorites.id));

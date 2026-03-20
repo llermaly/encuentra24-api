@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
 import { listings } from '@/db/schema';
-import { sql } from 'drizzle-orm';
+import { sql, isNull, and } from 'drizzle-orm';
 
 export async function GET() {
+  const active = isNull(listings.removedAt);
   const [categories, provinces, cities, locations] = await Promise.all([
     db
       .select({
@@ -12,6 +13,7 @@ export async function GET() {
         count: sql<number>`count(*)`,
       })
       .from(listings)
+      .where(active)
       .groupBy(listings.category, listings.subcategory)
       .orderBy(listings.category, listings.subcategory),
 
@@ -21,6 +23,7 @@ export async function GET() {
         count: sql<number>`count(*)`,
       })
       .from(listings)
+      .where(active)
       .groupBy(listings.province)
       .orderBy(listings.province),
 
@@ -31,6 +34,7 @@ export async function GET() {
         count: sql<number>`count(*)`,
       })
       .from(listings)
+      .where(active)
       .groupBy(listings.province, listings.city)
       .orderBy(listings.province, listings.city),
 
@@ -40,7 +44,7 @@ export async function GET() {
         count: sql<number>`count(*)`,
       })
       .from(listings)
-      .where(sql`${listings.location} IS NOT NULL`)
+      .where(and(active, sql`${listings.location} IS NOT NULL`))
       .groupBy(listings.location)
       .orderBy(listings.location),
   ]);

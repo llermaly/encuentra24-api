@@ -43,7 +43,7 @@ export async function backfillRemoved(options: { concurrency?: number; rateLimit
     navigationTimeoutSecs: 15,
     useSessionPool: true,
     sessionPoolOptions: { maxPoolSize: concurrency },
-    sameDomainDelaySecs: 0.5,
+    sameDomainDelaySecs: 0,
 
     requestHandler: async ({ $, request }) => {
       const adId = request.userData.adId as string;
@@ -56,8 +56,15 @@ export async function backfillRemoved(options: { concurrency?: number; rateLimit
       });
 
       if (!hasProductJsonLd) {
+        // Use lastSeenAt as approximate removal date (last time crawler saw it alive)
+        const row = await db
+          .select({ lastSeenAt: listings.lastSeenAt })
+          .from(listings)
+          .where(eq(listings.adId, adId))
+          .then(r => r[0]);
+        const removedDate = row?.lastSeenAt || now;
         await db.update(listings)
-          .set({ removedAt: now, removalCheckedAt: now, updatedAt: now })
+          .set({ removedAt: removedDate, removalCheckedAt: now, updatedAt: now })
           .where(eq(listings.adId, adId));
         removed++;
       } else {

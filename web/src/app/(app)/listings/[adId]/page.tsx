@@ -21,7 +21,7 @@ export default async function ListingDetailPage({
       sellerWhatsapp: sellers.whatsapp,
     })
     .from(listings)
-    .leftJoin(sellers, eq(listings.sellerId, sellers.id))
+    .leftJoin(sellers, eq(listings.sellerName, sellers.name))
     .leftJoin(favorites, and(eq(listings.adId, favorites.adId), eq(favorites.userId, user.id)))
     .leftJoin(pipelineItems, and(eq(listings.adId, pipelineItems.adId), eq(pipelineItems.userId, user.id)))
     .where(eq(listings.adId, adId))
@@ -42,7 +42,7 @@ export default async function ListingDetailPage({
         ...row.listing,
         isFavorite: row.isFavorite === 1,
         pipelineStage: row.pipelineStage ?? null,
-        sellerWhatsapp: row.sellerWhatsapp && row.sellerWhatsapp !== '50764261804' ? row.sellerWhatsapp : null,
+        sellerWhatsapp: row.sellerWhatsapp ?? null,
       }}
       priceHistory={prices}
       notes={notes}

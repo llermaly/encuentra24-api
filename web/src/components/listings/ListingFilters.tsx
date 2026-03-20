@@ -156,6 +156,18 @@ export function ListingFilters({ searchParams, onUpdate }: ListingFiltersProps) 
             onMinChange={v => onUpdate({ landAreaMin: v || undefined })}
             onMaxChange={v => onUpdate({ landAreaMax: v || undefined })}
           />
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Status</label>
+            <select
+              value={searchParams.get('status') || 'active'}
+              onChange={e => onUpdate({ status: e.target.value === 'active' ? undefined : e.target.value })}
+              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded bg-white text-gray-900"
+            >
+              <option value="active">Active only</option>
+              <option value="removed">Removed only</option>
+              <option value="all">All listings</option>
+            </select>
+          </div>
           <div className="flex items-end gap-4">
             <label className="flex items-center gap-1.5 text-sm text-gray-700">
               <input

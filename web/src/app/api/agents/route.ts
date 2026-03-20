@@ -141,6 +141,7 @@ export async function GET(request: NextRequest) {
         seller_type: string | null;
         seller_verified: number | null;
         listing_count: number;
+        total_listing_count: number;
         portfolio_value: number;
         avg_price: number;
         agent_count: number;
@@ -151,14 +152,15 @@ export async function GET(request: NextRequest) {
           l.seller_name,
           MAX(l.seller_type) as seller_type,
           MAX(CASE WHEN l.seller_verified THEN 1 ELSE 0 END) as seller_verified,
-          COUNT(*) as listing_count,
-          COALESCE(SUM(l.price), 0) as portfolio_value,
-          COALESCE(AVG(l.price), 0) as avg_price,
-          COUNT(DISTINCT CASE WHEN l.agent_name IS NOT NULL AND l.agent_name != '' THEN l.agent_name END) as agent_count,
+          COUNT(*) FILTER (WHERE l.removed_at IS NULL) as listing_count,
+          COUNT(*) as total_listing_count,
+          COALESCE(SUM(l.price) FILTER (WHERE l.removed_at IS NULL), 0) as portfolio_value,
+          COALESCE(AVG(l.price) FILTER (WHERE l.removed_at IS NULL), 0) as avg_price,
+          COUNT(DISTINCT CASE WHEN l.agent_name IS NOT NULL AND l.agent_name != '' AND l.removed_at IS NULL THEN l.agent_name END) as agent_count,
           pa.primary_location
         FROM listings l
         ${locationJoin}
-        WHERE l.seller_name IS NOT NULL AND l.removed_at IS NULL
+        WHERE l.seller_name IS NOT NULL
         ${searchFilter}
         ${locationWhere}
         GROUP BY l.seller_name, pa.primary_location
@@ -171,10 +173,11 @@ export async function GET(request: NextRequest) {
           SELECT l.seller_name
           FROM listings l
           ${locationJoin}
-          WHERE l.seller_name IS NOT NULL AND l.removed_at IS NULL
+          WHERE l.seller_name IS NOT NULL
           ${searchFilter}
           ${locationWhere}
           GROUP BY l.seller_name
+          HAVING COUNT(*) FILTER (WHERE l.removed_at IS NULL) > 0
         ) sub
       `)),
       db.all<{ seller_type: string; count: number }>(sql`
@@ -230,6 +233,7 @@ export async function GET(request: NextRequest) {
           type: a.seller_type,
           verified: Boolean(a.seller_verified),
           listingCount: a.listing_count,
+          totalListingCount: a.total_listing_count,
           portfolioValue: a.portfolio_value,
           avgPrice: Math.round(a.avg_price),
           agentCount: a.agent_count,

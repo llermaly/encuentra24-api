@@ -98,6 +98,7 @@ router.addHandler('LIST', async ({ $, request, enqueueLinks, crawler }) => {
             price: card.price,
             lastSeenAt: now,
             updatedAt: now,
+            removedAt: null, // clear removal if re-published
             detailCrawled: false, // re-crawl detail on price change
           })
           .where(eq(listings.adId, card.adId));
@@ -105,7 +106,7 @@ router.addHandler('LIST', async ({ $, request, enqueueLinks, crawler }) => {
       } else {
         // Same price — just update lastSeenAt
         await db.update(listings)
-          .set({ lastSeenAt: now })
+          .set({ lastSeenAt: now, removedAt: null })
           .where(eq(listings.adId, card.adId));
       }
     }

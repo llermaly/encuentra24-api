@@ -28,6 +28,8 @@ interface ListingCardProps {
     publishedAt: string | null;
     sellerName: string | null;
     agentName: string | null;
+    sellerVerified: boolean | null;
+    removedAt: string | null;
     featureLevel: string | null;
     favoritesCount: number | null;
   };
@@ -106,7 +108,7 @@ export function ListingCard({ listing }: ListingCardProps) {
   }, [images.length]);
 
   return (
-    <div className="bg-white rounded-lg border overflow-hidden hover:shadow-md transition-shadow">
+    <div className={`bg-white rounded-lg border overflow-hidden hover:shadow-md transition-shadow ${listing.removedAt ? 'border-red-300 opacity-75' : ''}`}>
       <div className="relative aspect-[4/3] bg-gray-100 group" onMouseEnter={preloadAll}>
         <Link href={`/listings/${listing.adId}`} className="block w-full h-full">
           {visibleSrc ? (
@@ -168,8 +170,15 @@ export function ListingCard({ listing }: ListingCardProps) {
           </span>
         )}
 
+        {/* Removed badge */}
+        {listing.removedAt && (
+          <span className="absolute top-2 left-2 bg-red-500 text-white text-xs font-medium px-1.5 py-0.5 rounded z-10">
+            Removed {formatRelativeDate(listing.removedAt)}
+          </span>
+        )}
+
         {/* Feature level badge */}
-        {listing.featureLevel && listing.featureLevel !== 'basic' && (
+        {!listing.removedAt && listing.featureLevel && listing.featureLevel !== 'basic' && (
           <span className="absolute top-2 left-2 bg-yellow-400 text-yellow-900 text-xs font-medium px-1.5 py-0.5 rounded">
             {listing.featureLevel}
           </span>
@@ -211,10 +220,16 @@ export function ListingCard({ listing }: ListingCardProps) {
           <p className="text-sm text-gray-700 mt-1 truncate">{listing.title}</p>
           <p className="text-xs text-gray-500 mt-0.5">{[listing.location, listing.city, listing.province].filter(Boolean).join(', ')}</p>
           {(listing.agentName || listing.sellerName) && (
-            <p className="text-xs text-gray-500 mt-1 truncate">
-              {listing.agentName || listing.sellerName}
-              {listing.agentName && listing.sellerName && (
-                <span className="text-gray-400"> - {listing.sellerName}</span>
+            <p className="text-xs text-gray-500 mt-1 truncate flex items-center gap-1">
+              <span>
+                {listing.agentName && listing.sellerName
+                  ? `${listing.agentName} \u00B7 ${listing.sellerName}`
+                  : listing.agentName || listing.sellerName}
+              </span>
+              {listing.sellerVerified && (
+                <svg className="w-3 h-3 text-blue-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
               )}
             </p>
           )}
@@ -234,7 +249,7 @@ export function ListingCard({ listing }: ListingCardProps) {
           </div>
           <div className="flex items-center justify-between mt-2">
             <p className="text-xs text-gray-400">
-              {formatRelativeDate(listing.firstSeenAt)}
+              {formatRelativeDate(listing.publishedAt || listing.firstSeenAt)}
             </p>
             {listing.favoritesCount != null && listing.favoritesCount > 0 && (
               <span className="text-xs text-gray-400 flex items-center gap-0.5">

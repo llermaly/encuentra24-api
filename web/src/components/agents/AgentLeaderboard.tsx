@@ -10,6 +10,7 @@ interface AgencyRow {
   type: string | null;
   verified: boolean;
   listingCount: number;
+  totalListingCount: number;
   portfolioValue: number;
   avgPrice: number;
   agentCount: number;
@@ -255,7 +256,12 @@ function AgenciesTable({ rows, isLoading }: { rows: AgencyRow[]; isLoading: bool
               )}
             </td>
             <td className="px-4 py-3 text-right text-gray-600">{row.agentCount || '—'}</td>
-            <td className="px-4 py-3 text-right font-medium">{row.listingCount}</td>
+            <td className="px-4 py-3 text-right font-medium">
+              {row.listingCount}
+              {row.totalListingCount > row.listingCount && (
+                <span className="text-xs text-gray-400 ml-1">/ {row.totalListingCount}</span>
+              )}
+            </td>
             <td className="px-4 py-3 text-right">{formatPrice(row.portfolioValue)}</td>
             <td className="px-4 py-3 text-right">{formatPrice(row.avgPrice)}</td>
             <td className="px-4 py-3 text-gray-600 text-xs truncate max-w-[180px]">{row.primaryLocation || '—'}</td>

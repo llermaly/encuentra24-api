@@ -20,6 +20,7 @@ export async function GET() {
       builtAreaSqm: listings.builtAreaSqm,
       images: listings.images,
       url: listings.url,
+      removedAt: listings.removedAt,
     })
     .from(favorites)
     .leftJoin(listings, eq(favorites.adId, listings.adId))

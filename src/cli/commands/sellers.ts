@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import { eq, sql, isNull } from 'drizzle-orm';
 import { CheerioCrawler, Configuration, log, LogLevel } from 'crawlee';
-import { getDb } from '../../db/connection.js';
+import { getDb, initDb } from '../../db/connection.js';
 import { listings, sellers } from '../../db/schema.js';
 import { config } from '../../config.js';
 import { scrapeWhatsAppBatch } from '../../scraper/whatsapp-scraper.js';
@@ -10,6 +10,7 @@ import { scrapeWhatsAppBatch } from '../../scraper/whatsapp-scraper.js';
  * Populate the sellers table from existing listing data.
  */
 async function syncSellers() {
+  await initDb();
   const db = getDb();
   const now = new Date().toISOString();
 
@@ -17,8 +18,8 @@ async function syncSellers() {
   const uniqueSellers = await db
     .select({
       name: listings.sellerName,
-      type: listings.sellerType,
-      verified: listings.sellerVerified,
+      type: sql<string>`MAX(${listings.sellerType})`,
+      verified: sql<boolean>`BOOL_OR(${listings.sellerVerified})`,
       count: sql<number>`count(*)`,
       sampleUrl: sql<string>`min(${listings.url})`,
     })
@@ -187,6 +188,8 @@ export const sellersCommand = new Command('sellers')
       .action(async (opts) => {
         if (!opts.skipSync) {
           await syncSellers();
+        } else {
+          await initDb();
         }
         await scrapeWhatsAppBatch({
           headless: opts.headless,

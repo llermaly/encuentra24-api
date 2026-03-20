@@ -23,6 +23,7 @@ export async function GET() {
       builtAreaSqm: listings.builtAreaSqm,
       images: listings.images,
       url: listings.url,
+      removedAt: listings.removedAt,
     })
     .from(pipelineItems)
     .leftJoin(listings, eq(pipelineItems.adId, listings.adId))
