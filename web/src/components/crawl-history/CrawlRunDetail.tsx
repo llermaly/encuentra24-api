@@ -248,7 +248,7 @@ export function CrawlRunDetail({ runId }: { runId: number }) {
             <div className="space-y-1.5 max-h-40 overflow-y-auto">
               {breakdowns.categories.map((c) => (
                 <div key={`${c.category}-${c.subcategory}`} className="flex justify-between text-sm">
-                  <span className="text-gray-700 truncate">{c.subcategory}</span>
+                  <span className="text-gray-700 truncate">{c.category} / {c.subcategory}</span>
                   <span className="font-medium text-gray-900 ml-2">{c.count}</span>
                 </div>
               ))}
