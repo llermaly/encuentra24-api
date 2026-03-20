@@ -1,5 +1,5 @@
 import { CheerioCrawler, Configuration, log, LogLevel } from 'crawlee';
-import { eq } from 'drizzle-orm';
+import { eq, sql, isNull, lt } from 'drizzle-orm';
 import { rmSync } from 'node:fs';
 import { router } from './router.js';
 import { findCategory, buildListUrl, type CategoryConfig } from './categories.js';
@@ -154,6 +154,21 @@ export async function runCrawl(options: CrawlOptions): Promise<void> {
     const finishedAt = new Date().toISOString();
     const durationSecs = Math.round((new Date(finishedAt).getTime() - new Date(startedAt).getTime()) / 1000);
 
+    // For full crawls, mark unseen listings as removed.
+    // A full crawl scans all list pages, so any active listing not seen during this crawl
+    // (lastSeenAt older than when we started) is no longer on the site.
+    let removedCount = 0;
+    if (full && !detailOnly && !category && !subcategory) {
+      const result = await db.update(listings)
+        .set({ removedAt: startedAt, removalCheckedAt: finishedAt })
+        .where(sql`${listings.removedAt} IS NULL AND ${listings.lastSeenAt} < ${startedAt}`)
+        .returning({ id: listings.id });
+      removedCount = result.length;
+      if (removedCount > 0) {
+        log.info(`Marked ${removedCount} listings as removed (not seen during full crawl)`);
+      }
+    }
+
     // Count stats from DB
     const stats = await getCrawlStats(db, crawlRunId, startedAt);
 
@@ -166,7 +181,7 @@ export async function runCrawl(options: CrawlOptions): Promise<void> {
       })
       .where(eq(crawlRuns.id, crawlRunId));
 
-    log.info(`Crawl run #${crawlRunId} completed in ${durationSecs}s`, stats);
+    log.info(`Crawl run #${crawlRunId} completed in ${durationSecs}s`, { ...stats, removedCount });
   } catch (error) {
     const errMsg = (error as Error).message || String(error);
     log.error(`Crawl run #${crawlRunId} failed: ${errMsg}`);
