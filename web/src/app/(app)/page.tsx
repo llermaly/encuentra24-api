@@ -39,38 +39,6 @@ interface LocationRow {
   newThisWeek: number;
 }
 
-interface DashboardData {
-  stats: {
-    totalListings: number;
-    newToday: number;
-    newThisWeek: number;
-    totalFavorites: number;
-  };
-  marketSummary: {
-    activeListings: number;
-    removedListings: number;
-    avgPrice: number | null;
-    activeSellers: number;
-  };
-  categoryBreakdown: CategoryRow[];
-  locationBreakdown: LocationRow[];
-  latestListings: ListingItem[];
-  savedSearches: Array<{
-    id: number;
-    name: string;
-    filters: string;
-    listings: ListingItem[];
-  }>;
-  lastCrawl: {
-    startedAt: string;
-    finishedAt: string | null;
-    status: string;
-    listingsFound: number;
-    listingsNew: number;
-    durationSecs: number | null;
-  } | null;
-}
-
 function formatCompactPrice(price: number | null | undefined): string {
   if (price == null) return '—';
   if (price >= 1_000_000) return `$${(price / 1_000_000).toFixed(1)}M`;
@@ -78,33 +46,11 @@ function formatCompactPrice(price: number | null | undefined): string {
   return `$${price.toFixed(0)}`;
 }
 
+type Tab = 'summary' | 'market' | 'searches';
+
 export default function DashboardPage() {
   useUser({ or: 'redirect' });
-  const [tab, setTab] = useState<'overview' | 'searches'>('overview');
-  const { data, isLoading } = useQuery<DashboardData>({
-    queryKey: ['dashboard'],
-    queryFn: () => fetch('/api/dashboard').then(r => r.json()),
-  });
-
-  if (isLoading || !data) {
-    return (
-      <div className="p-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">Dashboard</h1>
-        <div className="animate-pulse space-y-4">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-24 bg-gray-200 rounded-lg" />
-            ))}
-          </div>
-          <div className="h-64 bg-gray-200 rounded-lg" />
-        </div>
-      </div>
-    );
-  }
-
-  const savedSearches = data.savedSearches ?? [];
-  const lastCrawlStart = data.lastCrawl?.startedAt ?? null;
-  const market = data.marketSummary;
+  const [tab, setTab] = useState<Tab>('summary');
 
   return (
     <div className="p-6">
@@ -112,90 +58,153 @@ export default function DashboardPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 mb-6 border-b">
-        <button
-          onClick={() => setTab('overview')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-            tab === 'overview'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          Market Overview
-        </button>
-        <button
-          onClick={() => setTab('searches')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-            tab === 'searches'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          Saved Searches
-          {savedSearches.length > 0 && (
-            <span className="ml-1.5 text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">
-              {savedSearches.length}
-            </span>
-          )}
-        </button>
+        {([
+          { key: 'summary' as Tab, label: 'Summary' },
+          { key: 'market' as Tab, label: 'Market Overview' },
+          { key: 'searches' as Tab, label: 'Saved Searches' },
+        ]).map(t => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              tab === t.key
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
-      {tab === 'overview' && (
-        <div className="space-y-6">
-          {/* Stats row */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard label="Active Listings" value={market.activeListings.toLocaleString()} />
-            <StatCard label="New This Week" value={data.stats.newThisWeek.toLocaleString()} accent />
-            <StatCard label="Avg Price" value={formatCompactPrice(market.avgPrice)} />
-            <StatCard label="Active Sellers" value={market.activeSellers.toLocaleString()} />
+      {tab === 'summary' && <SummaryTab />}
+      {tab === 'market' && <MarketTab />}
+      {tab === 'searches' && <SearchesTab />}
+    </div>
+  );
+}
+
+/* ─── Summary Tab ────────────────────────────────────────────────────────── */
+
+function SummaryTab() {
+  const { data, isLoading } = useQuery({
+    queryKey: ['dashboard', 'summary'],
+    queryFn: () => fetch('/api/dashboard?tab=summary').then(r => r.json()),
+  });
+
+  if (isLoading || !data) {
+    return (
+      <div className="animate-pulse space-y-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => <div key={i} className="h-24 bg-gray-200 rounded-lg" />)}
+        </div>
+        <div className="h-64 bg-gray-200 rounded-lg" />
+      </div>
+    );
+  }
+
+  const { stats, latestListings, lastCrawl } = data;
+
+  return (
+    <div className="space-y-6">
+      {/* Stats row */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard label="Active Listings" value={stats.activeListings.toLocaleString()} />
+        <StatCard label="New This Week" value={stats.newThisWeek.toLocaleString()} accent />
+        <StatCard label="Avg Price" value={formatCompactPrice(stats.avgPrice)} />
+        <StatCard label="Active Sellers" value={stats.activeSellers.toLocaleString()} />
+      </div>
+
+      {/* Last crawl */}
+      {lastCrawl && (
+        <div className="bg-white rounded-lg border p-4">
+          <h2 className="text-lg font-semibold text-gray-900 mb-2">Last Crawl</h2>
+          <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-gray-600">
+            <span>Status: <span className={lastCrawl.status === 'completed' ? 'text-green-600 font-medium' : 'text-yellow-600 font-medium'}>{lastCrawl.status}</span></span>
+            <span>Started: {formatRelativeDate(lastCrawl.startedAt)}</span>
+            {lastCrawl.durationSecs && <span>Duration: {lastCrawl.durationSecs}s</span>}
+            {lastCrawl.listingsNew > 0 && <span className="text-green-600 font-medium">+{lastCrawl.listingsNew} new</span>}
+            <Link href="/crawl-history" className="text-blue-600 hover:underline">View history</Link>
           </div>
-
-          {/* Location Explorer (with category breakdown per location) */}
-          <LocationExplorer rows={data.locationBreakdown} />
-
-          {/* Category Breakdown */}
-          <CategoryBreakdown rows={data.categoryBreakdown} />
-
-          {/* Newest Properties */}
-          {(data.latestListings ?? []).length > 0 && (
-            <div className="bg-white rounded-lg border p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-lg font-semibold text-gray-900">Newest Properties</h2>
-                <Link href="/listings?sort=newest" className="text-sm text-blue-600 hover:underline">
-                  View all
-                </Link>
-              </div>
-              <div className="space-y-3">
-                {data.latestListings.map(listing => (
-                  <ListingRow key={listing.adId} listing={listing} />
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       )}
 
-      {tab === 'searches' && (
-        <div className="space-y-6">
-          {savedSearches.length === 0 ? (
-            <div className="bg-white rounded-lg border p-8 text-center">
-              <p className="text-gray-500">No saved searches yet.</p>
-              <p className="text-sm text-gray-400 mt-1">
-                Save a search from the{' '}
-                <Link href="/listings" className="text-blue-600 hover:underline">listings page</Link>
-                {' '}to track new matches.
-              </p>
-            </div>
-          ) : (
-            savedSearches.map(search => (
-              <SavedSearchBox
-                key={search.id}
-                search={search}
-                lastCrawlStart={lastCrawlStart}
-              />
-            ))
-          )}
+      {/* Newest Properties */}
+      {(latestListings ?? []).length > 0 && (
+        <div className="bg-white rounded-lg border p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold text-gray-900">Newest Properties</h2>
+            <Link href="/listings?sort=newest" className="text-sm text-blue-600 hover:underline">View all</Link>
+          </div>
+          <div className="space-y-3">
+            {latestListings.map((listing: ListingItem) => (
+              <ListingRow key={listing.adId} listing={listing} />
+            ))}
+          </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ─── Market Tab ─────────────────────────────────────────────────────────── */
+
+function MarketTab() {
+  const { data, isLoading } = useQuery({
+    queryKey: ['dashboard', 'market'],
+    queryFn: () => fetch('/api/dashboard?tab=market').then(r => r.json()),
+  });
+
+  if (isLoading || !data) {
+    return (
+      <div className="animate-pulse space-y-4">
+        <div className="h-64 bg-gray-200 rounded-lg" />
+        <div className="h-64 bg-gray-200 rounded-lg" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <LocationExplorer rows={data.locationBreakdown} />
+      <CategoryBreakdown rows={data.categoryBreakdown} />
+    </div>
+  );
+}
+
+/* ─── Searches Tab ───────────────────────────────────────────────────────── */
+
+function SearchesTab() {
+  const { data, isLoading } = useQuery({
+    queryKey: ['dashboard', 'searches'],
+    queryFn: () => fetch('/api/dashboard?tab=searches').then(r => r.json()),
+  });
+
+  if (isLoading || !data) {
+    return <div className="animate-pulse h-64 bg-gray-200 rounded-lg" />;
+  }
+
+  const savedSearches = data.savedSearches ?? [];
+  const lastCrawlStart = data.lastCrawlStart ?? null;
+
+  if (savedSearches.length === 0) {
+    return (
+      <div className="bg-white rounded-lg border p-8 text-center">
+        <p className="text-gray-500">No saved searches yet.</p>
+        <p className="text-sm text-gray-400 mt-1">
+          Save a search from the{' '}
+          <Link href="/listings" className="text-blue-600 hover:underline">listings page</Link>
+          {' '}to track new matches.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {savedSearches.map((search: any) => (
+        <SavedSearchBox key={search.id} search={search} lastCrawlStart={lastCrawlStart} />
+      ))}
     </div>
   );
 }
@@ -207,7 +216,6 @@ function CategoryBreakdown({ rows }: { rows: CategoryRow[] }) {
 
   if (!rows || rows.length === 0) return null;
 
-  // Group by category
   const grouped: Record<string, CategoryRow[]> = {};
   for (const row of rows) {
     if (!grouped[row.category]) grouped[row.category] = [];
@@ -243,10 +251,7 @@ function CategoryBreakdown({ rows }: { rows: CategoryRow[] }) {
                 className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors"
               >
                 <div className="flex items-center gap-2">
-                  <svg
-                    className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
-                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                  >
+                  <svg className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                   <span className="font-medium text-gray-900 capitalize">{category}</span>
@@ -256,9 +261,7 @@ function CategoryBreakdown({ rows }: { rows: CategoryRow[] }) {
                   <span className="text-gray-600">{catTotal.toLocaleString()} active</span>
                   <span className="text-gray-500">{formatCompactPrice(catAvgPrice)} avg</span>
                   {catNewWeek > 0 && (
-                    <span className="text-xs font-medium bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">
-                      +{catNewWeek} this week
-                    </span>
+                    <span className="text-xs font-medium bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">+{catNewWeek} this week</span>
                   )}
                 </div>
               </button>
@@ -279,10 +282,7 @@ function CategoryBreakdown({ rows }: { rows: CategoryRow[] }) {
                       {subcategories.map(row => (
                         <tr key={row.subcategory} className="hover:bg-gray-100 transition-colors">
                           <td className="px-4 py-2">
-                            <Link
-                              href={`/listings?category=${encodeURIComponent(row.category)}&subcategory=${encodeURIComponent(row.subcategory)}`}
-                              className="text-blue-600 hover:underline capitalize"
-                            >
+                            <Link href={`/listings?category=${encodeURIComponent(row.category)}&subcategory=${encodeURIComponent(row.subcategory)}`} className="text-blue-600 hover:underline capitalize">
                               {row.subcategory.replace(/-/g, ' ')}
                             </Link>
                           </td>
@@ -291,11 +291,7 @@ function CategoryBreakdown({ rows }: { rows: CategoryRow[] }) {
                           <td className="text-right px-4 py-2 text-gray-500 hidden sm:table-cell">{formatCompactPrice(row.minPrice)}</td>
                           <td className="text-right px-4 py-2 text-gray-500 hidden sm:table-cell">{formatCompactPrice(row.maxPrice)}</td>
                           <td className="text-right px-4 py-2">
-                            {row.newThisWeek > 0 ? (
-                              <span className="text-blue-600 font-medium">+{row.newThisWeek}</span>
-                            ) : (
-                              <span className="text-gray-400">0</span>
-                            )}
+                            {row.newThisWeek > 0 ? <span className="text-blue-600 font-medium">+{row.newThisWeek}</span> : <span className="text-gray-400">0</span>}
                           </td>
                         </tr>
                       ))}
@@ -329,216 +325,120 @@ interface LocationData {
 
 function LocationExplorer({ rows }: { rows: LocationRow[] }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [showAllCities, setShowAllCities] = useState(false);
 
   if (!rows || rows.length === 0) return null;
 
-  // Build city → location → category hierarchy
   const cityMap: Record<string, CityData> = {};
   for (const row of rows) {
-    if (!cityMap[row.city]) {
-      cityMap[row.city] = { totalActive: 0, totalNew: 0, avgPrice: null, locations: {} };
-    }
+    if (!cityMap[row.city]) cityMap[row.city] = { totalActive: 0, totalNew: 0, avgPrice: null, locations: {} };
     const city = cityMap[row.city];
     city.totalActive += row.active;
     city.totalNew += row.newThisWeek;
-
     const locKey = row.location || '_other';
-    if (!city.locations[locKey]) {
-      city.locations[locKey] = { totalActive: 0, totalNew: 0, avgPrice: null, categories: [] };
-    }
+    if (!city.locations[locKey]) city.locations[locKey] = { totalActive: 0, totalNew: 0, avgPrice: null, categories: [] };
     const loc = city.locations[locKey];
     loc.totalActive += row.active;
     loc.totalNew += row.newThisWeek;
-    loc.categories.push({
-      category: row.category,
-      subcategory: row.subcategory,
-      active: row.active,
-      avgPrice: row.avgPrice,
-      newThisWeek: row.newThisWeek,
-    });
+    loc.categories.push({ category: row.category, subcategory: row.subcategory, active: row.active, avgPrice: row.avgPrice, newThisWeek: row.newThisWeek });
   }
 
-  // Compute weighted avg prices
   for (const city of Object.values(cityMap)) {
-    let cityWeightedSum = 0, cityTotalActive = 0;
+    let wSum = 0, wTotal = 0;
     for (const loc of Object.values(city.locations)) {
       const priced = loc.categories.filter(c => c.avgPrice != null);
       if (priced.length > 0) {
-        const weightedSum = priced.reduce((s, c) => s + (c.avgPrice! * c.active), 0);
-        const totalAct = priced.reduce((s, c) => s + c.active, 0);
-        loc.avgPrice = totalAct > 0 ? weightedSum / totalAct : null;
-        cityWeightedSum += weightedSum;
-        cityTotalActive += totalAct;
+        const ws = priced.reduce((s, c) => s + (c.avgPrice! * c.active), 0);
+        const ta = priced.reduce((s, c) => s + c.active, 0);
+        loc.avgPrice = ta > 0 ? ws / ta : null;
+        wSum += ws; wTotal += ta;
       }
     }
-    city.avgPrice = cityTotalActive > 0 ? cityWeightedSum / cityTotalActive : null;
+    city.avgPrice = wTotal > 0 ? wSum / wTotal : null;
   }
 
   const sortedCities = Object.entries(cityMap).sort((a, b) => b[1].totalActive - a[1].totalActive);
-  const [showAllCities, setShowAllCities] = useState(false);
   const visibleCities = showAllCities ? sortedCities : sortedCities.slice(0, 10);
 
   const toggle = (key: string) => {
-    setExpanded(prev => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
+    setExpanded(prev => { const next = new Set(prev); if (next.has(key)) next.delete(key); else next.add(key); return next; });
   };
 
   return (
     <div className="bg-white rounded-lg border">
-      <div className="p-4 border-b">
-        <h2 className="text-lg font-semibold text-gray-900">Location Explorer</h2>
-      </div>
+      <div className="p-4 border-b"><h2 className="text-lg font-semibold text-gray-900">Location Explorer</h2></div>
       <div className="divide-y">
         {visibleCities.map(([cityName, city]) => {
           const cityExpanded = expanded.has(`c:${cityName}`);
-          const sortedLocations = Object.entries(city.locations)
-            .sort((a, b) => b[1].totalActive - a[1].totalActive);
-
+          const sortedLocations = Object.entries(city.locations).sort((a, b) => b[1].totalActive - a[1].totalActive);
           return (
             <div key={cityName}>
-              {/* City row */}
-              <button
-                onClick={() => toggle(`c:${cityName}`)}
-                className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors"
-              >
+              <button onClick={() => toggle(`c:${cityName}`)} className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors">
                 <div className="flex items-center gap-2">
-                  <svg
-                    className={`w-4 h-4 text-gray-400 transition-transform ${cityExpanded ? 'rotate-90' : ''}`}
-                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                  <Link
-                    href={`/listings?city=${encodeURIComponent(cityName)}`}
-                    onClick={e => e.stopPropagation()}
-                    className="font-medium text-gray-900 hover:text-blue-600"
-                  >
-                    {cityName}
-                  </Link>
+                  <svg className={`w-4 h-4 text-gray-400 transition-transform ${cityExpanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                  <Link href={`/listings?city=${encodeURIComponent(cityName)}`} onClick={e => e.stopPropagation()} className="font-medium text-gray-900 hover:text-blue-600">{cityName}</Link>
                   <span className="text-xs text-gray-400">{sortedLocations.length} areas</span>
                 </div>
                 <div className="flex items-center gap-4 text-sm">
                   <span className="text-gray-600">{city.totalActive.toLocaleString()} active</span>
                   <span className="text-gray-500">{formatCompactPrice(city.avgPrice)} avg</span>
-                  {city.totalNew > 0 && (
-                    <span className="text-xs font-medium bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">
-                      +{city.totalNew} this week
-                    </span>
-                  )}
+                  {city.totalNew > 0 && <span className="text-xs font-medium bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">+{city.totalNew} this week</span>}
                 </div>
               </button>
-
-              {/* Locations within city */}
               {cityExpanded && (() => {
-                const showAllAreas = expanded.has(`showAll:${cityName}`);
-                const visibleLocations = showAllAreas ? sortedLocations : sortedLocations.slice(0, 10);
-                const hiddenCount = sortedLocations.length - 10;
-
+                const showAll = expanded.has(`showAll:${cityName}`);
+                const visible = showAll ? sortedLocations : sortedLocations.slice(0, 10);
+                const hidden = sortedLocations.length - 10;
                 return (
-                <div className="border-t bg-gray-50">
-                  {visibleLocations.map(([locKey, loc]) => {
-                    const locName = locKey === '_other' ? 'Other' : locKey;
-                    const locExpanded = expanded.has(`l:${cityName}:${locKey}`);
-                    const sortedCats = [...loc.categories].sort((a, b) => b.active - a.active);
-
-                    return (
-                      <div key={locKey} className="border-b border-gray-100 last:border-b-0">
-                        {/* Location row */}
-                        <button
-                          onClick={() => toggle(`l:${cityName}:${locKey}`)}
-                          className="w-full flex items-center justify-between px-4 pl-10 py-2.5 hover:bg-gray-100 transition-colors"
-                        >
-                          <div className="flex items-center gap-2">
-                            <svg
-                              className={`w-3.5 h-3.5 text-gray-400 transition-transform ${locExpanded ? 'rotate-90' : ''}`}
-                              fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                            >
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
-                            <Link
-                              href={`/listings?city=${encodeURIComponent(cityName)}&location=${encodeURIComponent(locKey === '_other' ? '' : locKey)}`}
-                              onClick={e => e.stopPropagation()}
-                              className="text-sm text-gray-800 hover:text-blue-600"
-                            >
-                              {locName}
-                            </Link>
-                          </div>
-                          <div className="flex items-center gap-4 text-sm">
-                            <span className="text-gray-600">{loc.totalActive.toLocaleString()}</span>
-                            <span className="text-gray-500">{formatCompactPrice(loc.avgPrice)}</span>
-                            {loc.totalNew > 0 && (
-                              <span className="text-xs text-blue-600 font-medium">+{loc.totalNew}</span>
-                            )}
-                          </div>
-                        </button>
-
-                        {/* Category breakdown within location */}
-                        {locExpanded && (
-                          <div className="bg-white border-t border-gray-100">
-                            <table className="w-full text-xs">
-                              <thead>
-                                <tr className="text-gray-400 uppercase">
-                                  <th className="text-left pl-16 pr-4 py-1.5 font-medium">Type</th>
-                                  <th className="text-right px-4 py-1.5 font-medium">Active</th>
-                                  <th className="text-right px-4 py-1.5 font-medium">Avg Price</th>
-                                  <th className="text-right px-4 py-1.5 font-medium">New</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-gray-50">
-                                {sortedCats.map(cat => (
-                                  <tr key={`${cat.category}-${cat.subcategory}`} className="hover:bg-gray-50">
-                                    <td className="pl-16 pr-4 py-1.5">
-                                      <Link
-                                        href={`/listings?city=${encodeURIComponent(cityName)}&location=${encodeURIComponent(locKey === '_other' ? '' : locKey)}&category=${encodeURIComponent(cat.category)}&subcategory=${encodeURIComponent(cat.subcategory)}`}
-                                        className="text-blue-600 hover:underline capitalize"
-                                      >
-                                        {cat.subcategory.replace(/-/g, ' ')}
-                                      </Link>
-                                      <span className="text-gray-400 ml-1 capitalize">({cat.category})</span>
-                                    </td>
-                                    <td className="text-right px-4 py-1.5 text-gray-700">{cat.active}</td>
-                                    <td className="text-right px-4 py-1.5 text-gray-700">{formatCompactPrice(cat.avgPrice)}</td>
-                                    <td className="text-right px-4 py-1.5">
-                                      {cat.newThisWeek > 0 ? (
-                                        <span className="text-blue-600 font-medium">+{cat.newThisWeek}</span>
-                                      ) : (
-                                        <span className="text-gray-400">0</span>
-                                      )}
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                  {!showAllAreas && hiddenCount > 0 && (
-                    <button
-                      onClick={() => toggle(`showAll:${cityName}`)}
-                      className="w-full py-2.5 pl-10 text-xs text-blue-600 hover:text-blue-800 hover:bg-gray-100 transition-colors text-left"
-                    >
-                      Show {hiddenCount} more areas
-                    </button>
-                  )}
-                </div>
+                  <div className="border-t bg-gray-50">
+                    {visible.map(([locKey, loc]) => {
+                      const locName = locKey === '_other' ? 'Other' : locKey;
+                      const locExpanded = expanded.has(`l:${cityName}:${locKey}`);
+                      const sortedCats = [...loc.categories].sort((a, b) => b.active - a.active);
+                      return (
+                        <div key={locKey} className="border-b border-gray-100 last:border-b-0">
+                          <button onClick={() => toggle(`l:${cityName}:${locKey}`)} className="w-full flex items-center justify-between px-4 pl-10 py-2.5 hover:bg-gray-100 transition-colors">
+                            <div className="flex items-center gap-2">
+                              <svg className={`w-3.5 h-3.5 text-gray-400 transition-transform ${locExpanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                              <Link href={`/listings?city=${encodeURIComponent(cityName)}&location=${encodeURIComponent(locKey === '_other' ? '' : locKey)}`} onClick={e => e.stopPropagation()} className="text-sm text-gray-800 hover:text-blue-600">{locName}</Link>
+                            </div>
+                            <div className="flex items-center gap-4 text-sm">
+                              <span className="text-gray-600">{loc.totalActive.toLocaleString()}</span>
+                              <span className="text-gray-500">{formatCompactPrice(loc.avgPrice)}</span>
+                              {loc.totalNew > 0 && <span className="text-xs text-blue-600 font-medium">+{loc.totalNew}</span>}
+                            </div>
+                          </button>
+                          {locExpanded && (
+                            <div className="bg-white border-t border-gray-100">
+                              <table className="w-full text-xs">
+                                <thead><tr className="text-gray-400 uppercase"><th className="text-left pl-16 pr-4 py-1.5 font-medium">Type</th><th className="text-right px-4 py-1.5 font-medium">Active</th><th className="text-right px-4 py-1.5 font-medium">Avg Price</th><th className="text-right px-4 py-1.5 font-medium">New</th></tr></thead>
+                                <tbody className="divide-y divide-gray-50">
+                                  {sortedCats.map(cat => (
+                                    <tr key={`${cat.category}-${cat.subcategory}`} className="hover:bg-gray-50">
+                                      <td className="pl-16 pr-4 py-1.5"><Link href={`/listings?city=${encodeURIComponent(cityName)}&location=${encodeURIComponent(locKey === '_other' ? '' : locKey)}&category=${encodeURIComponent(cat.category)}&subcategory=${encodeURIComponent(cat.subcategory)}`} className="text-blue-600 hover:underline capitalize">{cat.subcategory.replace(/-/g, ' ')}</Link><span className="text-gray-400 ml-1 capitalize">({cat.category})</span></td>
+                                      <td className="text-right px-4 py-1.5 text-gray-700">{cat.active}</td>
+                                      <td className="text-right px-4 py-1.5 text-gray-700">{formatCompactPrice(cat.avgPrice)}</td>
+                                      <td className="text-right px-4 py-1.5">{cat.newThisWeek > 0 ? <span className="text-blue-600 font-medium">+{cat.newThisWeek}</span> : <span className="text-gray-400">0</span>}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {!showAll && hidden > 0 && (
+                      <button onClick={() => toggle(`showAll:${cityName}`)} className="w-full py-2.5 pl-10 text-xs text-blue-600 hover:text-blue-800 hover:bg-gray-100 transition-colors text-left">Show {hidden} more areas</button>
+                    )}
+                  </div>
                 );
               })()}
             </div>
           );
         })}
         {!showAllCities && sortedCities.length > 10 && (
-          <button
-            onClick={() => setShowAllCities(true)}
-            className="w-full py-3 text-sm text-blue-600 hover:text-blue-800 hover:bg-gray-50 transition-colors"
-          >
-            Show {sortedCities.length - 10} more cities
-          </button>
+          <button onClick={() => setShowAllCities(true)} className="w-full py-3 text-sm text-blue-600 hover:text-blue-800 hover:bg-gray-50 transition-colors">Show {sortedCities.length - 10} more cities</button>
         )}
       </div>
     </div>
@@ -547,15 +447,10 @@ function LocationExplorer({ rows }: { rows: LocationRow[] }) {
 
 /* ─── Saved Searches ──────────────────────────────────────────────────────── */
 
-function SavedSearchBox({ search, lastCrawlStart }: {
-  search: { id: number; name: string; filters: string; listings: ListingItem[] };
-  lastCrawlStart: string | null;
-}) {
+function SavedSearchBox({ search, lastCrawlStart }: { search: { id: number; name: string; filters: string; listings: ListingItem[] }; lastCrawlStart: string | null }) {
   const [expanded, setExpanded] = useState(false);
   const searchListings = search.listings ?? [];
-  const newCount = lastCrawlStart
-    ? searchListings.filter(l => l.firstSeenAt >= lastCrawlStart).length
-    : 0;
+  const newCount = lastCrawlStart ? searchListings.filter(l => l.firstSeenAt >= lastCrawlStart).length : 0;
   const visible = expanded ? searchListings : searchListings.slice(0, 5);
   const hasMore = searchListings.length > 5;
 
@@ -564,37 +459,17 @@ function SavedSearchBox({ search, lastCrawlStart }: {
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-lg font-semibold text-gray-900">{search.name}</h2>
         <div className="flex items-center gap-3">
-          {newCount > 0 && (
-            <span className="text-xs font-medium bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
-              {newCount} new
-            </span>
-          )}
-          <Link
-            href={`/listings?${new URLSearchParams(JSON.parse(search.filters)).toString()}`}
-            className="text-sm text-blue-600 hover:underline"
-          >
-            View all
-          </Link>
+          {newCount > 0 && <span className="text-xs font-medium bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{newCount} new</span>}
+          <Link href={`/listings?${new URLSearchParams(JSON.parse(search.filters)).toString()}`} className="text-sm text-blue-600 hover:underline">View all</Link>
         </div>
       </div>
       {searchListings.length === 0 ? (
         <p className="text-gray-500 text-sm">No listings match this search.</p>
       ) : (
         <div className="space-y-3">
-          {visible.map(listing => (
-            <ListingRow
-              key={listing.adId}
-              listing={listing}
-              isNew={!!lastCrawlStart && listing.firstSeenAt >= lastCrawlStart}
-            />
-          ))}
+          {visible.map(listing => <ListingRow key={listing.adId} listing={listing} isNew={!!lastCrawlStart && listing.firstSeenAt >= lastCrawlStart} />)}
           {hasMore && !expanded && (
-            <button
-              onClick={() => setExpanded(true)}
-              className="w-full text-sm text-blue-600 hover:text-blue-800 py-2"
-            >
-              Show {searchListings.length - 5} more
-            </button>
+            <button onClick={() => setExpanded(true)} className="w-full text-sm text-blue-600 hover:text-blue-800 py-2">Show {searchListings.length - 5} more</button>
           )}
         </div>
       )}
@@ -606,21 +481,14 @@ function SavedSearchBox({ search, lastCrawlStart }: {
 
 function ListingRow({ listing, isNew }: { listing: ListingItem; isNew?: boolean }) {
   return (
-    <Link
-      href={`/listings/${listing.adId}`}
-      className={`flex items-center gap-3 p-2 rounded hover:bg-gray-50 ${isNew ? 'bg-blue-50 border border-blue-200' : ''}`}
-    >
+    <Link href={`/listings/${listing.adId}`} className={`flex items-center gap-3 p-2 rounded hover:bg-gray-50 ${isNew ? 'bg-blue-50 border border-blue-200' : ''}`}>
       {listing.thumbnail ? (
         <img src={listing.thumbnail} alt="" className="w-12 h-12 rounded object-cover" />
       ) : (
-        <div className="w-12 h-12 rounded bg-gray-100 flex items-center justify-center text-gray-400 text-xs">
-          No img
-        </div>
+        <div className="w-12 h-12 rounded bg-gray-100 flex items-center justify-center text-gray-400 text-xs">No img</div>
       )}
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray-900 truncate">
-          {listing.title || listing.adId}
-        </p>
+        <p className="text-sm font-medium text-gray-900 truncate">{listing.title || listing.adId}</p>
         <p className="text-xs text-gray-500">{listing.location}</p>
       </div>
       <div className="hidden sm:flex items-center gap-3 text-xs text-gray-500">
