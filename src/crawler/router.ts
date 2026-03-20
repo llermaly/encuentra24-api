@@ -192,14 +192,12 @@ router.addHandler('DETAIL', async ({ $, request }) => {
   const now = new Date().toISOString();
 
   // Detect removed listings: encuentra24 redirects removed listings to a search results page
-  // instead of returning 404. A valid detail page has a JSON-LD script with @type "Product".
-  const jsonLdScripts = $('script[type="application/ld+json"]');
-  const hasProductJsonLd = jsonLdScripts.toArray().some((el) => {
-    const text = $(el).text();
-    return text.includes('"@type":"Product"') || text.includes('"@type": "Product"');
-  });
+  // instead of returning 404. A search results page has multiple listing cards (d3-ad-tile)
+  // and no contact form. A valid detail page (even without JSON-LD) has a contact form.
+  const isSearchResultsPage = $('.d3-ad-tile').length > 1;
+  const hasContactForm = $('[id^="messageform"]').length > 0;
 
-  if (!hasProductJsonLd) {
+  if (isSearchResultsPage && !hasContactForm) {
     log.info(`Listing ${adId} no longer exists (redirected to search page), marking as removed`);
     await db.update(listings)
       .set({ removedAt: now, removalCheckedAt: now, updatedAt: now })

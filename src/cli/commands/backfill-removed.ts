@@ -49,13 +49,10 @@ export async function backfillRemoved(options: { concurrency?: number; rateLimit
       const adId = request.userData.adId as string;
       const now = new Date().toISOString();
 
-      const jsonLdScripts = $('script[type="application/ld+json"]');
-      const hasProductJsonLd = jsonLdScripts.toArray().some((el) => {
-        const text = $(el).text();
-        return text.includes('"@type":"Product"') || text.includes('"@type": "Product"');
-      });
+      const isSearchResultsPage = $('.d3-ad-tile').length > 1;
+      const hasContactForm = $('[id^="messageform"]').length > 0;
 
-      if (!hasProductJsonLd) {
+      if (isSearchResultsPage && !hasContactForm) {
         // Use lastSeenAt as approximate removal date (last time crawler saw it alive)
         const row = await db
           .select({ lastSeenAt: listings.lastSeenAt })
@@ -79,6 +76,20 @@ export async function backfillRemoved(options: { concurrency?: number; rateLimit
         const elapsed = (Date.now() - startTime) / 1000 / 60;
         const rate = Math.round(checked / elapsed);
         log.info(`Progress: ${checked}/${unchecked.length} checked (${removed} removed, ${valid} valid) — ${rate}/min`);
+      }
+      // Vacuum every 5000 rows to prevent table bloat
+      if (checked % 5000 === 0) {
+        log.info('Running VACUUM ANALYZE to prevent bloat...');
+        const dbUrl = process.env.DATABASE_URL || '';
+        // VACUUM needs direct connection (port 5432), not transaction pooler (6543)
+        const vacuumUrl = dbUrl.replace(':6543/', ':5432/');
+        const { execSync } = await import('child_process');
+        try {
+          execSync(`psql "${vacuumUrl}" -c "VACUUM ANALYZE listings;"`, { timeout: 120000 });
+          log.info('VACUUM completed');
+        } catch {
+          log.info('VACUUM skipped (direct connection unavailable)');
+        }
       }
     },
 
