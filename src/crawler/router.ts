@@ -191,14 +191,21 @@ router.addHandler('DETAIL', async ({ $, request }) => {
   const db = getDb();
   const now = new Date().toISOString();
 
-  // Detect removed listings: encuentra24 redirects removed listings to a search results page
-  // instead of returning 404. A search results page has multiple listing cards (d3-ad-tile)
-  // and no contact form. A valid detail page (even without JSON-LD) has a contact form.
-  const isSearchResultsPage = $('.d3-ad-tile').length > 1;
-  const hasContactForm = $('[id^="messageform"]').length > 0;
+  // The redesigned site redirects missing ads to the category page. Guard against false removals
+  // by requiring that the final loaded URL no longer contains the ad ID and that detail markers
+  // are absent on the rendered page.
+  const loadedUrl = request.loadedUrl || request.url;
+  const canonicalUrl = $('link[rel="canonical"]').attr('href') || loadedUrl;
+  const hasAdIdInFinalUrl = loadedUrl.includes(`/${adId}`) || canonicalUrl.includes(`/${adId}`);
+  const hasContactForm = $('[data-contact-form="true"]').length > 0;
+  const hasDetailHeading = $('h1').length > 0 && $('h2').filter((_, el) => $(el).text().trim() === 'Descripción').length > 0;
 
-  if (isSearchResultsPage && !hasContactForm) {
-    log.info(`Listing ${adId} no longer exists (redirected to search page), marking as removed`);
+  if (!hasAdIdInFinalUrl && !hasContactForm && !hasDetailHeading) {
+    log.info(`Listing ${adId} no longer exists (redirected away from detail page), marking as removed`, {
+      url: request.url,
+      loadedUrl,
+      canonicalUrl,
+    });
     await db.update(listings)
       .set({ removedAt: now, removalCheckedAt: now, updatedAt: now })
       .where(eq(listings.adId, adId));
