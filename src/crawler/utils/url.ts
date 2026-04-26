@@ -27,6 +27,38 @@ export function extractSlugFromUrl(url: string): string | null {
   return match ? match[1] : null;
 }
 
+function extractPathParts(url: string): string[] {
+  try {
+    return new URL(url, 'https://www.encuentra24.com').pathname.split('/').filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Extract the category slug from a category or detail URL.
+ * URL pattern: /panama-es/{category-slug}/...
+ */
+export function extractCategorySlugFromUrl(url: string): string | null {
+  const parts = extractPathParts(url);
+  return parts[1] || null;
+}
+
+/**
+ * Real-estate URLs always live under a bienes-raices* category slug.
+ */
+export function isRealEstateUrl(url: string): boolean {
+  const categorySlug = extractCategorySlugFromUrl(url);
+  return categorySlug?.startsWith('bienes-raices') ?? false;
+}
+
+/**
+ * Ensure a URL belongs to the exact category page/detail slug we are crawling.
+ */
+export function matchesCategorySlug(url: string, expectedSlug: string): boolean {
+  return extractCategorySlugFromUrl(url) === expectedSlug;
+}
+
 /**
  * Get the maximum page number from pagination links.
  */

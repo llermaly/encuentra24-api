@@ -17,6 +17,7 @@ export async function POST() {
   for (const search of searches) {
     const filters: ListingFilters = JSON.parse(search.filters);
     const where = buildListingWhere(filters);
+    const needsUserJoins = filters.isFavorite || filters.inPipeline;
 
     const timeFilter = search.lastCheckedAt
       ? gte(listings.firstSeenAt, search.lastCheckedAt)
@@ -24,12 +25,17 @@ export async function POST() {
 
     const combined = where && timeFilter ? and(where, timeFilter) : (timeFilter ?? where);
 
-    const countResult = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(listings)
-      .leftJoin(favorites, and(eq(listings.adId, favorites.adId), eq(favorites.userId, user.id)))
-      .leftJoin(pipelineItems, and(eq(listings.adId, pipelineItems.adId), eq(pipelineItems.userId, user.id)))
-      .where(combined);
+    const countResult = needsUserJoins
+      ? await db
+          .select({ count: sql<number>`count(*)` })
+          .from(listings)
+          .leftJoin(favorites, and(eq(listings.adId, favorites.adId), eq(favorites.userId, user.id)))
+          .leftJoin(pipelineItems, and(eq(listings.adId, pipelineItems.adId), eq(pipelineItems.userId, user.id)))
+          .where(combined)
+      : await db
+          .select({ count: sql<number>`count(*)` })
+          .from(listings)
+          .where(combined);
 
     const now = new Date().toISOString();
     await db

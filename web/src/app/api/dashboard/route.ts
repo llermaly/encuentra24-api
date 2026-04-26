@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { listings, crawlRuns, favorites, savedSearches } from '@/db/schema';
 import { sql, desc, gte, eq, and, isNull } from 'drizzle-orm';
-import { buildListingWhere } from '@/db/query-builder';
-import type { ListingFilters } from '@/types/filters';
 import { requireUser } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
@@ -24,11 +22,16 @@ export async function GET(request: NextRequest) {
         db.select({ count: sql<number>`count(*)` }).from(listings).where(and(active, gte(listings.firstSeenAt, weekAgo))),
         db.select({ count: sql<number>`count(*)` }).from(favorites).where(eq(favorites.userId, user.id)),
         db.all<{ avg_price_sale: number | null; avg_price_rent: number | null; active_sellers: number }>(sql`
+          WITH active_listings AS MATERIALIZED (
+            SELECT category, price, seller_name
+            FROM listings
+            WHERE removed_at IS NULL
+          )
           SELECT
             AVG(price) FILTER (WHERE price IS NOT NULL AND category = 'sale') as avg_price_sale,
             AVG(price) FILTER (WHERE price IS NOT NULL AND category = 'rental') as avg_price_rent,
             COUNT(DISTINCT seller_name) as active_sellers
-          FROM listings WHERE removed_at IS NULL
+          FROM active_listings
         `),
       ]),
       db.select().from(crawlRuns).orderBy(desc(crawlRuns.startedAt)).limit(1),
@@ -130,44 +133,12 @@ export async function GET(request: NextRequest) {
     const userSearches = await db
       .select()
       .from(savedSearches)
-      .where(eq(savedSearches.userId, user.id));
-
-    const savedSearchResults = await Promise.all(
-      userSearches.map(async (search: typeof savedSearches.$inferSelect) => {
-        const filters: ListingFilters = JSON.parse(search.filters);
-        const where = buildListingWhere(filters);
-
-        const matchingListings = await db
-          .select({
-            adId: listings.adId, title: listings.title, price: listings.price,
-            location: listings.location, bedrooms: listings.bedrooms,
-            bathrooms: listings.bathrooms, builtAreaSqm: listings.builtAreaSqm,
-            images: listings.images, firstSeenAt: listings.firstSeenAt,
-          })
-          .from(listings)
-          .where(where)
-          .orderBy(desc(listings.firstSeenAt))
-          .limit(10);
-
-        return {
-          id: search.id,
-          name: search.name,
-          filters: search.filters,
-          listings: matchingListings.map((l: any) => ({
-            ...l,
-            thumbnail: Array.isArray(l.images) && l.images.length > 0 ? l.images[0] : null,
-            images: undefined,
-          })),
-        };
-      })
-    );
-
-    const lastCrawl = await db.select().from(crawlRuns).orderBy(desc(crawlRuns.startedAt)).limit(1);
+      .where(eq(savedSearches.userId, user.id))
+      .orderBy(desc(savedSearches.updatedAt));
 
     return NextResponse.json({
       tab: 'searches',
-      savedSearches: savedSearchResults,
-      lastCrawlStart: lastCrawl[0]?.startedAt ?? null,
+      savedSearches: userSearches,
     });
   }
 

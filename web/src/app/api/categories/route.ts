@@ -1,53 +1,59 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
-import { listings } from '@/db/schema';
-import { sql, isNull, and } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
+
+type FacetRow = {
+  facet: 'categories' | 'provinces' | 'cities' | 'locations';
+  category: string | null;
+  subcategory: string | null;
+  province: string | null;
+  city: string | null;
+  location: string | null;
+  count: number;
+};
 
 export async function GET() {
-  const active = isNull(listings.removedAt);
-  const [categories, provinces, cities, locations] = await Promise.all([
-    db
-      .select({
-        category: listings.category,
-        subcategory: listings.subcategory,
-        count: sql<number>`count(*)`,
-      })
-      .from(listings)
-      .where(active)
-      .groupBy(listings.category, listings.subcategory)
-      .orderBy(listings.category, listings.subcategory),
+  const facetRows = await db.all<FacetRow>(sql`
+    SELECT
+      CASE
+        WHEN GROUPING(category) = 0 AND GROUPING(subcategory) = 0 THEN 'categories'
+        WHEN GROUPING(province) = 0 AND GROUPING(city) = 1 THEN 'provinces'
+        WHEN GROUPING(province) = 0 AND GROUPING(city) = 0 THEN 'cities'
+        WHEN GROUPING(location) = 0 THEN 'locations'
+      END as facet,
+      category,
+      subcategory,
+      province,
+      city,
+      location,
+      COUNT(*)::int as count
+    FROM listings
+    WHERE removed_at IS NULL
+    GROUP BY GROUPING SETS (
+      (category, subcategory),
+      (province),
+      (province, city),
+      (location)
+    )
+    HAVING NOT (GROUPING(location) = 0 AND location IS NULL)
+    ORDER BY facet, category, subcategory, province, city, location
+  `);
 
-    db
-      .select({
-        province: listings.province,
-        count: sql<number>`count(*)`,
-      })
-      .from(listings)
-      .where(active)
-      .groupBy(listings.province)
-      .orderBy(listings.province),
+  const categories = facetRows
+    .filter((row) => row.facet === 'categories')
+    .map(({ category, subcategory, count }) => ({ category, subcategory, count }));
 
-    db
-      .select({
-        province: listings.province,
-        city: listings.city,
-        count: sql<number>`count(*)`,
-      })
-      .from(listings)
-      .where(active)
-      .groupBy(listings.province, listings.city)
-      .orderBy(listings.province, listings.city),
+  const provinces = facetRows
+    .filter((row) => row.facet === 'provinces')
+    .map(({ province, count }) => ({ province, count }));
 
-    db
-      .select({
-        location: listings.location,
-        count: sql<number>`count(*)`,
-      })
-      .from(listings)
-      .where(and(active, sql`${listings.location} IS NOT NULL`))
-      .groupBy(listings.location)
-      .orderBy(listings.location),
-  ]);
+  const cities = facetRows
+    .filter((row) => row.facet === 'cities')
+    .map(({ province, city, count }) => ({ province, city, count }));
+
+  const locations = facetRows
+    .filter((row) => row.facet === 'locations')
+    .map(({ location, count }) => ({ location, count }));
 
   return NextResponse.json({ categories, provinces, cities, locations });
 }

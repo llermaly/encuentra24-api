@@ -4,7 +4,8 @@ import { getDb } from '../db/connection.js';
 import { listings, priceHistory, crawlErrors } from '../db/schema.js';
 import { extractListingCards, extractGa4Data, extractPagination, extractResultsCount, mergeGa4DataIntoCards } from './extractors/list-page.js';
 import { extractDetailData } from './extractors/detail-page.js';
-import { buildListUrl, type CategoryConfig } from './categories.js';
+import { buildListUrl, findCategory, type CategoryConfig } from './categories.js';
+import { isRealEstateUrl, matchesCategorySlug } from './utils/url.js';
 
 export const router = createCheerioRouter();
 
@@ -22,6 +23,18 @@ router.addHandler('LIST', async ({ $, request, enqueueLinks, crawler }) => {
   const currentPage = (request.userData.page as number) || 1;
   log.info(`LIST page ${currentPage} for ${categoryConfig.label}`, { url: request.url });
 
+  const loadedUrl = request.loadedUrl || request.url;
+  const canonicalUrl = $('link[rel="canonical"]').attr('href') || loadedUrl;
+  if (!matchesCategorySlug(loadedUrl, categoryConfig.slug) || !matchesCategorySlug(canonicalUrl, categoryConfig.slug)) {
+    log.warning('Skipping list page because final URL/canonical no longer match the requested real-estate category', {
+      requestedUrl: request.url,
+      loadedUrl,
+      canonicalUrl,
+      expectedSlug: categoryConfig.slug,
+    });
+    return;
+  }
+
   // Extract listing cards
   const cards = extractListingCards($);
   const ga4Data = extractGa4Data($);
@@ -38,8 +51,19 @@ router.addHandler('LIST', async ({ $, request, enqueueLinks, crawler }) => {
   const now = new Date().toISOString();
   let newCount = 0;
   let updatedCount = 0;
+  let skippedCount = 0;
 
   for (const card of cards) {
+    if (!isRealEstateUrl(card.url) || !matchesCategorySlug(card.url, categoryConfig.slug)) {
+      skippedCount++;
+      log.warning('Skipping listing outside the requested real-estate category', {
+        adId: card.adId,
+        listingUrl: card.url,
+        expectedSlug: categoryConfig.slug,
+      });
+      continue;
+    }
+
     // Check if listing already exists
     const existing = await db
       .select({ adId: listings.adId, price: listings.price })
@@ -112,7 +136,7 @@ router.addHandler('LIST', async ({ $, request, enqueueLinks, crawler }) => {
     }
   }
 
-  log.info(`Page ${currentPage}: ${newCount} new, ${updatedCount} updated, ${cards.length - newCount - updatedCount} unchanged`);
+  log.info(`Page ${currentPage}: ${newCount} new, ${updatedCount} updated, ${cards.length - newCount - updatedCount - skippedCount} unchanged, ${skippedCount} skipped`);
 
   // Update crawl run stats
   await db.update(crawlErrors); // no-op, just to ensure table exists
@@ -190,6 +214,15 @@ router.addHandler('DETAIL', async ({ $, request }) => {
 
   const db = getDb();
   const now = new Date().toISOString();
+  const existingListing = await db
+    .select({
+      category: listings.category,
+      subcategory: listings.subcategory,
+      url: listings.url,
+    })
+    .from(listings)
+    .where(eq(listings.adId, adId))
+    .then(r => r[0]);
 
   // The redesigned site redirects missing ads to the category page. Guard against false removals
   // by requiring that the final loaded URL no longer contains the ad ID and that detail markers
@@ -199,6 +232,23 @@ router.addHandler('DETAIL', async ({ $, request }) => {
   const hasAdIdInFinalUrl = loadedUrl.includes(`/${adId}`) || canonicalUrl.includes(`/${adId}`);
   const hasContactForm = $('[data-contact-form="true"]').length > 0;
   const hasDetailHeading = $('h1').length > 0 && $('h2').filter((_, el) => $(el).text().trim() === 'Descripción').length > 0;
+  const expectedSlug = existingListing
+    ? findCategory(existingListing.category ?? undefined, existingListing.subcategory ?? undefined)[0]?.slug
+    : null;
+
+  if (!isRealEstateUrl(loadedUrl) || !isRealEstateUrl(canonicalUrl) || (expectedSlug && (!matchesCategorySlug(loadedUrl, expectedSlug) || !matchesCategorySlug(canonicalUrl, expectedSlug)))) {
+    log.warning('Marking listing as removed because detail page resolved outside the expected real-estate category', {
+      adId,
+      loadedUrl,
+      canonicalUrl,
+      expectedSlug,
+      storedUrl: existingListing?.url,
+    });
+    await db.update(listings)
+      .set({ removedAt: now, removalCheckedAt: now, updatedAt: now, detailCrawled: true })
+      .where(eq(listings.adId, adId));
+    return;
+  }
 
   if (!hasAdIdInFinalUrl && !hasContactForm && !hasDetailHeading) {
     log.info(`Listing ${adId} no longer exists (redirected away from detail page), marking as removed`, {
