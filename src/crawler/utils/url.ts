@@ -41,7 +41,7 @@ function extractPathParts(url: string): string[] {
  */
 export function extractCategorySlugFromUrl(url: string): string | null {
   const parts = extractPathParts(url);
-  return parts[1] || null;
+  return parts[1]?.replace(/\.\d+$/, '') || null;
 }
 
 /**

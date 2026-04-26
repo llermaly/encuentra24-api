@@ -14,6 +14,20 @@ test('extractCategorySlugFromUrl returns the listing category segment', () => {
   );
 });
 
+test('extractCategorySlugFromUrl strips pagination suffixes from category pages', () => {
+  assert.equal(
+    extractCategorySlugFromUrl('https://www.encuentra24.com/panama-es/bienes-raices-alquiler-casas.2?sort=f_added&dir=desc'),
+    'bienes-raices-alquiler-casas',
+  );
+  assert.equal(
+    matchesCategorySlug(
+      'https://www.encuentra24.com/panama-es/bienes-raices-alquiler-casas.2?sort=f_added&dir=desc',
+      'bienes-raices-alquiler-casas',
+    ),
+    true,
+  );
+});
+
 test('isRealEstateUrl rejects non real-estate listings', () => {
   assert.equal(
     isRealEstateUrl('https://www.encuentra24.com/panama-es/electronica-computadora-oficina-macintosh-software/apple-imac-24-2023-como-nuevo/32210244'),

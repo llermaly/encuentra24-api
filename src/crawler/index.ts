@@ -159,11 +159,31 @@ export async function runCrawl(options: CrawlOptions): Promise<void> {
     // (lastSeenAt older than when we started) is no longer on the site.
     let removedCount = 0;
     if (full && !detailOnly && !category && !subcategory) {
-      const result = await db.update(listings)
+      const [activeResult, seenResult] = await Promise.all([
+        db.select({ count: sql<number>`count(*)` })
+          .from(listings)
+          .where(isNull(listings.removedAt)),
+        db.select({ count: sql<number>`count(*)` })
+          .from(listings)
+          .where(sql`${listings.removedAt} IS NULL AND ${listings.lastSeenAt} >= ${startedAt}`),
+      ]);
+      const activeCount = Number(activeResult?.[0]?.count || 0);
+      const seenCount = Number(seenResult?.[0]?.count || 0);
+
+      if (activeCount >= 1000 && seenCount < Math.floor(activeCount * 0.5)) {
+        throw new Error(`Full crawl safety check failed: only ${seenCount}/${activeCount} active listings were seen; refusing to mark unseen listings as removed`);
+      }
+
+      const [toRemoveResult] = await db.select({ count: sql<number>`count(*)` })
+        .from(listings)
+        .where(sql`${listings.removedAt} IS NULL AND ${listings.lastSeenAt} < ${startedAt}`);
+
+      removedCount = Number(toRemoveResult?.count || 0);
+
+      await db.update(listings)
         .set({ removedAt: startedAt, removalCheckedAt: finishedAt })
-        .where(sql`${listings.removedAt} IS NULL AND ${listings.lastSeenAt} < ${startedAt}`)
-        .returning({ id: listings.id });
-      removedCount = result.length;
+        .where(sql`${listings.removedAt} IS NULL AND ${listings.lastSeenAt} < ${startedAt}`);
+
       if (removedCount > 0) {
         log.info(`Marked ${removedCount} listings as removed (not seen during full crawl)`);
       }

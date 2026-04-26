@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { listings, crawlRuns, favorites, savedSearches } from '@/db/schema';
 import { sql, desc, gte, eq, and, isNull } from 'drizzle-orm';
+import { buildListingWhere } from '@/db/query-builder';
+import type { ListingFilters } from '@/types/filters';
 import { requireUser } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
@@ -136,9 +138,42 @@ export async function GET(request: NextRequest) {
       .where(eq(savedSearches.userId, user.id))
       .orderBy(desc(savedSearches.updatedAt));
 
+    const savedSearchResults = await Promise.all(
+      userSearches.map(async (search: typeof savedSearches.$inferSelect) => {
+        const filters: ListingFilters = JSON.parse(search.filters);
+        const where = buildListingWhere(filters);
+
+        const matchingListings = await db
+          .select({
+            adId: listings.adId, title: listings.title, price: listings.price,
+            location: listings.location, bedrooms: listings.bedrooms,
+            bathrooms: listings.bathrooms, builtAreaSqm: listings.builtAreaSqm,
+            images: listings.images, firstSeenAt: listings.firstSeenAt,
+          })
+          .from(listings)
+          .where(where)
+          .orderBy(desc(listings.firstSeenAt))
+          .limit(10);
+
+        return {
+          id: search.id,
+          name: search.name,
+          filters: search.filters,
+          listings: matchingListings.map((l: any) => ({
+            ...l,
+            thumbnail: Array.isArray(l.images) && l.images.length > 0 ? l.images[0] : null,
+            images: undefined,
+          })),
+        };
+      })
+    );
+
+    const lastCrawl = await db.select().from(crawlRuns).orderBy(desc(crawlRuns.startedAt)).limit(1);
+
     return NextResponse.json({
       tab: 'searches',
-      savedSearches: userSearches,
+      savedSearches: savedSearchResults,
+      lastCrawlStart: lastCrawl[0]?.startedAt ?? null,
     });
   }
 

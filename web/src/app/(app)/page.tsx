@@ -39,12 +39,11 @@ interface LocationRow {
   newThisWeek: number;
 }
 
-interface SavedSearchSummary {
+interface SavedSearchPreview {
   id: number;
   name: string;
   filters: string;
-  lastCheckedAt: string | null;
-  newMatchCount: number | null;
+  listings: ListingItem[];
 }
 
 function formatCompactPrice(price: number | null | undefined): string {
@@ -184,14 +183,17 @@ function MarketTab() {
 /* ─── Searches Tab ───────────────────────────────────────────────────────── */
 
 function SearchesTab() {
-  const { data: savedSearches = [], isLoading } = useQuery<SavedSearchSummary[]>({
-    queryKey: ['saved-searches'],
-    queryFn: () => fetch('/api/saved-searches').then(r => r.json()),
+  const { data, isLoading } = useQuery<{ savedSearches: SavedSearchPreview[]; lastCrawlStart: string | null }>({
+    queryKey: ['dashboard', 'searches'],
+    queryFn: () => fetch('/api/dashboard?tab=searches').then(r => r.json()),
   });
 
-  if (isLoading) {
+  if (isLoading || !data) {
     return <div className="animate-pulse h-64 bg-gray-200 rounded-lg" />;
   }
+
+  const savedSearches = data.savedSearches ?? [];
+  const lastCrawlStart = data.lastCrawlStart ?? null;
 
   if (savedSearches.length === 0) {
     return (
@@ -209,7 +211,7 @@ function SearchesTab() {
   return (
     <div className="space-y-6">
       {savedSearches.map((search) => (
-        <SavedSearchBox key={search.id} search={search} />
+        <SavedSearchBox key={search.id} search={search} lastCrawlStart={lastCrawlStart} />
       ))}
     </div>
   );
@@ -453,63 +455,32 @@ function LocationExplorer({ rows }: { rows: LocationRow[] }) {
 
 /* ─── Saved Searches ──────────────────────────────────────────────────────── */
 
-function getSearchParams(filtersJson: string): URLSearchParams {
-  const params = new URLSearchParams();
-
-  try {
-    const filters = JSON.parse(filtersJson) as Record<string, unknown>;
-    for (const [key, value] of Object.entries(filters)) {
-      if (value != null && value !== '') params.set(key, String(value));
-    }
-  } catch {
-    return params;
-  }
-
-  return params;
-}
-
-function formatFilterSummary(filtersJson: string): string {
-  try {
-    const filters = JSON.parse(filtersJson) as Record<string, unknown>;
-    const parts: string[] = [];
-
-    if (typeof filters.q === 'string' && filters.q) parts.push(`"${filters.q}"`);
-    if (typeof filters.category === 'string' && filters.category) parts.push(filters.category);
-    if (typeof filters.subcategory === 'string' && filters.subcategory) parts.push(filters.subcategory);
-    if (filters.priceMin || filters.priceMax) parts.push(`$${filters.priceMin || '0'}-${filters.priceMax || '∞'}`);
-    if (filters.bedroomsMin) parts.push(`${filters.bedroomsMin}+ bd`);
-    if (typeof filters.location === 'string' && filters.location) parts.push(filters.location);
-    if (typeof filters.province === 'string' && filters.province) parts.push(filters.province);
-
-    return parts.join(' · ') || 'All listings';
-  } catch {
-    return 'All listings';
-  }
-}
-
-function SavedSearchBox({ search }: { search: SavedSearchSummary }) {
-  const newCount = search.newMatchCount ?? 0;
-  const params = getSearchParams(search.filters);
+function SavedSearchBox({ search, lastCrawlStart }: { search: SavedSearchPreview; lastCrawlStart: string | null }) {
+  const [expanded, setExpanded] = useState(false);
+  const searchListings = search.listings ?? [];
+  const newCount = lastCrawlStart ? searchListings.filter(l => l.firstSeenAt >= lastCrawlStart).length : 0;
+  const visible = expanded ? searchListings : searchListings.slice(0, 5);
+  const hasMore = searchListings.length > 5;
 
   return (
     <div className="bg-white rounded-lg border p-4">
       <div className="flex items-center justify-between mb-3">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900">{search.name}</h2>
-          <p className="text-sm text-gray-500">{formatFilterSummary(search.filters)}</p>
-          {search.lastCheckedAt && (
-            <p className="text-xs text-gray-400 mt-1">Last checked {formatRelativeDate(search.lastCheckedAt)}</p>
-          )}
-        </div>
+        <h2 className="text-lg font-semibold text-gray-900">{search.name}</h2>
         <div className="flex items-center gap-3">
-          {newCount > 0 && (
-            <span className="text-xs font-medium bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
-              {newCount} new
-            </span>
-          )}
-          <Link href={`/listings?${params.toString()}`} className="text-sm text-blue-600 hover:underline">View all</Link>
+          {newCount > 0 && <span className="text-xs font-medium bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{newCount} new</span>}
+          <Link href={`/listings?${new URLSearchParams(JSON.parse(search.filters)).toString()}`} className="text-sm text-blue-600 hover:underline">View all</Link>
         </div>
       </div>
+      {searchListings.length === 0 ? (
+        <p className="text-gray-500 text-sm">No listings match this search.</p>
+      ) : (
+        <div className="space-y-3">
+          {visible.map(listing => <ListingRow key={listing.adId} listing={listing} isNew={!!lastCrawlStart && listing.firstSeenAt >= lastCrawlStart} />)}
+          {hasMore && !expanded && (
+            <button onClick={() => setExpanded(true)} className="w-full text-sm text-blue-600 hover:text-blue-800 py-2">Show {searchListings.length - 5} more</button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
