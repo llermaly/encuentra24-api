@@ -461,14 +461,18 @@ function SavedSearchBox({ search, lastCrawlStart }: { search: SavedSearchPreview
   const newCount = lastCrawlStart ? searchListings.filter(l => l.firstSeenAt >= lastCrawlStart).length : 0;
   const visible = expanded ? searchListings : searchListings.slice(0, 5);
   const hasMore = searchListings.length > 5;
+  const params = getSearchParams(search.filters);
 
   return (
     <div className="bg-white rounded-lg border p-4">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-lg font-semibold text-gray-900">{search.name}</h2>
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">{search.name}</h2>
+          <p className="text-sm text-gray-500">{formatFilterSummary(search.filters)}</p>
+        </div>
         <div className="flex items-center gap-3">
           {newCount > 0 && <span className="text-xs font-medium bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{newCount} new</span>}
-          <Link href={`/listings?${new URLSearchParams(JSON.parse(search.filters)).toString()}`} className="text-sm text-blue-600 hover:underline">View all</Link>
+          <Link href={`/listings?${params.toString()}`} className="text-sm text-blue-600 hover:underline">View all</Link>
         </div>
       </div>
       {searchListings.length === 0 ? (
@@ -483,6 +487,40 @@ function SavedSearchBox({ search, lastCrawlStart }: { search: SavedSearchPreview
       )}
     </div>
   );
+}
+
+function getSearchParams(filtersJson: string): URLSearchParams {
+  const params = new URLSearchParams();
+
+  try {
+    const filters = JSON.parse(filtersJson) as Record<string, unknown>;
+    for (const [key, value] of Object.entries(filters)) {
+      if (value != null && value !== '') params.set(key, String(value));
+    }
+  } catch {
+    return params;
+  }
+
+  return params;
+}
+
+function formatFilterSummary(filtersJson: string): string {
+  try {
+    const filters = JSON.parse(filtersJson) as Record<string, unknown>;
+    const parts: string[] = [];
+
+    if (typeof filters.q === 'string' && filters.q) parts.push(`"${filters.q}"`);
+    if (typeof filters.category === 'string' && filters.category) parts.push(filters.category);
+    if (typeof filters.subcategory === 'string' && filters.subcategory) parts.push(filters.subcategory);
+    if (filters.priceMin || filters.priceMax) parts.push(`$${filters.priceMin || '0'}-${filters.priceMax || '∞'}`);
+    if (filters.bedroomsMin) parts.push(`${filters.bedroomsMin}+ bd`);
+    if (typeof filters.location === 'string' && filters.location) parts.push(filters.location);
+    if (typeof filters.province === 'string' && filters.province) parts.push(filters.province);
+
+    return parts.join(' · ') || 'All listings';
+  } catch {
+    return 'All listings';
+  }
 }
 
 /* ─── Shared Components ───────────────────────────────────────────────────── */

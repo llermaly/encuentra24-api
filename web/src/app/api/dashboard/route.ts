@@ -3,8 +3,25 @@ import { db } from '@/db';
 import { listings, crawlRuns, favorites, savedSearches } from '@/db/schema';
 import { sql, desc, gte, eq, and, isNull } from 'drizzle-orm';
 import { buildListingWhere } from '@/db/query-builder';
-import type { ListingFilters } from '@/types/filters';
+import { parseFiltersFromParams, type ListingFilters } from '@/types/filters';
 import { requireUser } from '@/lib/auth';
+
+function parseSavedSearchFilters(filtersJson: string): ListingFilters {
+  const params = new URLSearchParams();
+
+  try {
+    const rawFilters = JSON.parse(filtersJson) as Record<string, unknown>;
+    for (const [key, value] of Object.entries(rawFilters)) {
+      if (value != null && value !== '') params.set(key, String(value));
+    }
+  } catch {
+    return { status: 'active' };
+  }
+
+  const filters = parseFiltersFromParams(params);
+  if (!filters.status) filters.status = 'active';
+  return filters;
+}
 
 export async function GET(request: NextRequest) {
   const user = await requireUser();
@@ -140,7 +157,7 @@ export async function GET(request: NextRequest) {
 
     const savedSearchResults = await Promise.all(
       userSearches.map(async (search: typeof savedSearches.$inferSelect) => {
-        const filters: ListingFilters = JSON.parse(search.filters);
+        const filters = parseSavedSearchFilters(search.filters);
         const where = buildListingWhere(filters);
 
         const matchingListings = await db
