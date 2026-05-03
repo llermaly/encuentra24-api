@@ -16,16 +16,18 @@ This app runs against a live PostgreSQL database with real crawled data. Treat e
 - `main` is the production branch. `stage` is the production-like staging branch.
 - Vercel uses the existing `encuentra24-api` project for both environments: do not create a separate Vercel project for staging unless the user explicitly changes this architecture.
 - Vercel project details: project `encuentra24-api`, project id `prj_LccjoDXiORVjhSM2fWo5eUXtskQg`, team slug `my-team-43dbe230`, team id `team_AZDD5XdLKWjaDiWBNWcpKX2t`, root directory `web`, Node.js `24.x`, framework `Next.js`.
-- Vercel branch mapping: Production tracks `main`; custom environment `stage` exists with id `env_xb8IK0rFusqCHDjJRVtMapAiBR6z` but must not be attached to the `stage` branch until its stage `DATABASE_URL` is configured.
-- Vercel stage env status as of 2026-05-03: `NEXT_PUBLIC_STACK_PROJECT_ID`, `NEXT_PUBLIC_STACK_PUBLISHABLE_CLIENT_KEY`, and `STACK_SECRET_SERVER_KEY` are configured for `stage`; `DATABASE_URL` is still pending until the Coolify stage database is created and seeded.
+- Vercel branch mapping: Production tracks `main`; custom environment `stage` tracks branch `stage` with matcher `{ type: "equals", pattern: "stage" }`.
+- Vercel stage environment: id `env_xb8IK0rFusqCHDjJRVtMapAiBR6z`; environment alias `https://encuentra24-api-env-stage-my-team-43dbe230.vercel.app`; deployment `dpl_DuhzT26BkJHVLCjdvvMC7GmC5wvx` was ready on 2026-05-03.
+- Vercel stage env status as of 2026-05-03: `NEXT_PUBLIC_STACK_PROJECT_ID`, `NEXT_PUBLIC_STACK_PUBLISHABLE_CLIENT_KEY`, `STACK_SECRET_SERVER_KEY`, and `DATABASE_URL` are configured for `stage`.
 - Coolify server: UUID `r36ux4cb65rdjty4mfwzxddp`; API/panel host is the configured Coolify instance in `~/.config/coolify/config.json`.
 - Coolify project for this app: `Encuentra24`, UUID `e42ax6tdsu98817izek5cfld`, production environment UUID `dp0u9b5klwxms2gp4njlgxck`.
 - Production Coolify database: resource `encuentra24-db`, UUID `vl1l6zp76jkgc2uiu03oopiy`, image `postgres:18.3-alpine`, public port `54321`, database/user `encuentra24`, limits `2` CPU and `2g` memory. Do not paste or commit the password from Coolify output.
-- Planned staging Coolify database: resource `encuentra24-stage-db`, database/user `encuentra24_stage`, image `postgres:18.3-alpine`, proposed public port `54322`, proposed limits `1` CPU and `1g` memory. Creating this resource still requires explicit user confirmation of resource limits.
+- Staging Coolify database: resource `encuentra24-stage-db`, UUID `z8svayjxuxcj5xowgd78m2bh`, image `postgres:18.3-alpine`, public port `54322`, database/user `encuentra24_stage`, limits `1` CPU, `1g` memory, and `0` swap. Local stage DB credentials are stored outside the repo at `~/.config/encuentra24/stage-db.json` with mode `600`.
 - The staging web deployment must use the staging PostgreSQL database only, never the production `DATABASE_URL`.
 - The production Coolify database is the source of truth; the stage database is disposable and can be wiped after explicit confirmation.
 - Do not run crawlers against production while testing staging changes unless the user explicitly asks for it.
 - `coolify database list --format json` prints database passwords. Use it only when needed, never paste the secret values into chat, commits, logs, or docs.
+- Last verified prod-to-stage seed: 2026-05-03. Matching counts after restore: `listings` 97106, `price_history` 17836, `sellers` 1542, `crawl_runs` 1300, `crawl_errors` 3275.
 
 #### Wipe and Re-Seed Stage Database From Production
 Use this only for the stage database. These commands intentionally drop objects in the stage database, so verify both connection targets before running them.
