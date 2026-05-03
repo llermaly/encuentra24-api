@@ -1,4 +1,4 @@
-import { pgTable, text, integer, doublePrecision, boolean, serial, index, uniqueIndex, jsonb } from 'drizzle-orm/pg-core';
+import { pgTable, text, integer, doublePrecision, boolean, serial, index, uniqueIndex, jsonb, primaryKey } from 'drizzle-orm/pg-core';
 
 export const listings = pgTable('listings', {
   id: serial().primaryKey(),
@@ -123,6 +123,16 @@ export const crawlRuns = pgTable('crawl_runs', {
   errors: integer().default(0),
   durationSecs: integer('duration_secs'),
 });
+
+export const crawlSeenListings = pgTable('crawl_seen_listings', {
+  crawlRunId: integer('crawl_run_id').notNull(),
+  adId: text('ad_id').notNull(),
+  seenAt: text('seen_at').notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.crawlRunId, table.adId], name: 'crawl_seen_listings_pkey' }),
+  index('idx_csl_ad_id').on(table.adId),
+  index('idx_csl_seen_at').on(table.seenAt),
+]);
 
 export const sellers = pgTable('sellers', {
   id: serial().primaryKey(),

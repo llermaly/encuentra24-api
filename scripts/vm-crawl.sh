@@ -1,6 +1,7 @@
 #!/bin/bash
 # VM crawl script - called by GCE startup-script on boot
-# Auto-detects Sunday for full crawl, otherwise incremental
+# Runs full crawl only for the explicit Sunday 03:00 Panama full-crawl window,
+# otherwise runs incremental.
 # Shuts down the VM after completion (even on failure)
 set -uo pipefail
 
@@ -10,7 +11,8 @@ trap 'echo "[$(date)] Shutting down VM..." >> "${LOGFILE:-/tmp/crawl.log}" 2>&1;
 WORKDIR="/home/gustavo/encuentra24-api"
 LOG_DIR="$WORKDIR/data"
 TIMESTAMP=$(date '+%Y%m%d_%H%M%S')
-DAY_OF_WEEK=$(date '+%u') # 1=Monday, 7=Sunday
+PANAMA_DAY_OF_WEEK=$(TZ=America/Panama date '+%u') # 1=Monday, 7=Sunday
+PANAMA_HOUR=$(TZ=America/Panama date '+%H')
 
 mkdir -p "$LOG_DIR"
 cd "$WORKDIR"
@@ -26,15 +28,15 @@ if [ -n "$CRAWL_MODE" ]; then
     --keys=crawl-mode 2>/dev/null || true
 fi
 
-# Determine crawl mode: metadata override > Sunday auto-detect > incremental
-if [ "$CRAWL_MODE" = "full" ] || [ "$DAY_OF_WEEK" = "7" ]; then
+# Determine crawl mode: metadata override > Sunday 03:00 Panama full window > incremental
+if [ "$CRAWL_MODE" = "full" ] || { [ "$PANAMA_DAY_OF_WEEK" = "7" ] && [ "$PANAMA_HOUR" = "03" ]; }; then
   CRAWL_ARGS="--full"
   LOGFILE="$LOG_DIR/crawl-full-${TIMESTAMP}.log"
-  echo "[$(date)] Starting FULL crawl (mode=$CRAWL_MODE, day=$DAY_OF_WEEK)" | tee "$LOGFILE"
+  echo "[$(date)] Starting FULL crawl (mode=$CRAWL_MODE, panama_day=$PANAMA_DAY_OF_WEEK, panama_hour=$PANAMA_HOUR)" | tee "$LOGFILE"
 else
   CRAWL_ARGS=""
   LOGFILE="$LOG_DIR/crawl-incr-${TIMESTAMP}.log"
-  echo "[$(date)] Starting INCREMENTAL crawl" | tee "$LOGFILE"
+  echo "[$(date)] Starting INCREMENTAL crawl (mode=$CRAWL_MODE, panama_day=$PANAMA_DAY_OF_WEEK, panama_hour=$PANAMA_HOUR)" | tee "$LOGFILE"
 fi
 
 # Pull latest code

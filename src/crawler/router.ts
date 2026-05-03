@@ -1,7 +1,7 @@
 import { createCheerioRouter, log } from 'crawlee';
 import { eq } from 'drizzle-orm';
 import { getDb } from '../db/connection.js';
-import { listings, priceHistory, crawlErrors } from '../db/schema.js';
+import { listings, priceHistory, crawlErrors, crawlSeenListings } from '../db/schema.js';
 import { extractListingCards, extractGa4Data, extractPagination, extractResultsCount, mergeGa4DataIntoCards } from './extractors/list-page.js';
 import { extractDetailData } from './extractors/detail-page.js';
 import { buildListUrl, findCategory, type CategoryConfig } from './categories.js';
@@ -18,6 +18,7 @@ router.addHandler('LIST', async ({ $, request, enqueueLinks, crawler }) => {
     regionSlug?: string;
     maxPages: number;
     crawlRunId: number;
+    trackSeen?: boolean;
   };
 
   const currentPage = (request.userData.page as number) || 1;
@@ -51,7 +52,9 @@ router.addHandler('LIST', async ({ $, request, enqueueLinks, crawler }) => {
   const now = new Date().toISOString();
   let newCount = 0;
   let updatedCount = 0;
+  let unchangedCount = 0;
   let skippedCount = 0;
+  const seenValues: (typeof crawlSeenListings.$inferInsert)[] = [];
 
   for (const card of cards) {
     if (!isRealEstateUrl(card.url) || !matchesCategorySlug(card.url, categoryConfig.slug)) {
@@ -64,9 +67,17 @@ router.addHandler('LIST', async ({ $, request, enqueueLinks, crawler }) => {
       continue;
     }
 
+    if (request.userData.trackSeen) {
+      seenValues.push({
+        crawlRunId,
+        adId: card.adId,
+        seenAt: now,
+      });
+    }
+
     // Check if listing already exists
     const existing = await db
-      .select({ adId: listings.adId, price: listings.price })
+      .select({ adId: listings.adId, price: listings.price, removedAt: listings.removedAt })
       .from(listings)
       .where(eq(listings.adId, card.adId))
       .then(r => r[0]);
@@ -128,15 +139,27 @@ router.addHandler('LIST', async ({ $, request, enqueueLinks, crawler }) => {
           .where(eq(listings.adId, card.adId));
         updatedCount++;
       } else {
-        // Same price — just update lastSeenAt
-        await db.update(listings)
-          .set({ lastSeenAt: now, removedAt: null })
-          .where(eq(listings.adId, card.adId));
+        if (existing.removedAt !== null) {
+          // Listing reappeared after being marked removed.
+          await db.update(listings)
+            .set({ lastSeenAt: now, removedAt: null, updatedAt: now })
+            .where(eq(listings.adId, card.adId));
+          updatedCount++;
+        } else {
+          // Same price and still active: skip the listing row write.
+          unchangedCount++;
+        }
       }
     }
   }
 
-  log.info(`Page ${currentPage}: ${newCount} new, ${updatedCount} updated, ${cards.length - newCount - updatedCount - skippedCount} unchanged, ${skippedCount} skipped`);
+  if (seenValues.length > 0) {
+    await db.insert(crawlSeenListings)
+      .values(seenValues)
+      .onConflictDoNothing();
+  }
+
+  log.info(`Page ${currentPage}: ${newCount} new, ${updatedCount} updated, ${unchangedCount} unchanged, ${skippedCount} skipped`);
 
   // Update crawl run stats
   await db.update(crawlErrors); // no-op, just to ensure table exists
@@ -196,6 +219,7 @@ router.addHandler('LIST', async ({ $, request, enqueueLinks, crawler }) => {
         maxPages,
         crawlRunId,
         page: nextPage,
+        trackSeen: request.userData.trackSeen,
       },
     }]);
   }

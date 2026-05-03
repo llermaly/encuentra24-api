@@ -5,7 +5,7 @@ import { router } from './router.js';
 import { findCategory, buildListUrl, type CategoryConfig } from './categories.js';
 import { config } from '../config.js';
 import { getDb, initDb } from '../db/connection.js';
-import { listings, crawlRuns, crawlErrors } from '../db/schema.js';
+import { listings, crawlRuns, crawlErrors, crawlSeenListings } from '../db/schema.js';
 
 export interface CrawlOptions {
   category?: string;
@@ -144,6 +144,7 @@ export async function runCrawl(options: CrawlOptions): Promise<void> {
           maxPages: effectiveMaxPages,
           crawlRunId,
           page: 1,
+          trackSeen: full && !detailOnly && !category && !subcategory,
         },
       }));
 
@@ -165,7 +166,12 @@ export async function runCrawl(options: CrawlOptions): Promise<void> {
           .where(isNull(listings.removedAt)),
         db.select({ count: sql<number>`count(*)` })
           .from(listings)
-          .where(sql`${listings.removedAt} IS NULL AND ${listings.lastSeenAt} >= ${startedAt}`),
+          .where(sql`${listings.removedAt} IS NULL AND EXISTS (
+            SELECT 1
+            FROM ${crawlSeenListings}
+            WHERE ${crawlSeenListings.crawlRunId} = ${crawlRunId}
+              AND ${crawlSeenListings.adId} = ${listings.adId}
+          )`),
       ]);
       const activeCount = Number(activeResult?.[0]?.count || 0);
       const seenCount = Number(seenResult?.[0]?.count || 0);
@@ -176,13 +182,23 @@ export async function runCrawl(options: CrawlOptions): Promise<void> {
 
       const [toRemoveResult] = await db.select({ count: sql<number>`count(*)` })
         .from(listings)
-        .where(sql`${listings.removedAt} IS NULL AND ${listings.lastSeenAt} < ${startedAt}`);
+        .where(sql`${listings.removedAt} IS NULL AND NOT EXISTS (
+          SELECT 1
+          FROM ${crawlSeenListings}
+          WHERE ${crawlSeenListings.crawlRunId} = ${crawlRunId}
+            AND ${crawlSeenListings.adId} = ${listings.adId}
+        )`);
 
       removedCount = Number(toRemoveResult?.count || 0);
 
       await db.update(listings)
         .set({ removedAt: startedAt, removalCheckedAt: finishedAt })
-        .where(sql`${listings.removedAt} IS NULL AND ${listings.lastSeenAt} < ${startedAt}`);
+        .where(sql`${listings.removedAt} IS NULL AND NOT EXISTS (
+          SELECT 1
+          FROM ${crawlSeenListings}
+          WHERE ${crawlSeenListings.crawlRunId} = ${crawlRunId}
+            AND ${crawlSeenListings.adId} = ${listings.adId}
+        )`);
 
       if (removedCount > 0) {
         log.info(`Marked ${removedCount} listings as removed (not seen during full crawl)`);
