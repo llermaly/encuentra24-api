@@ -14,6 +14,8 @@ This app runs against a live PostgreSQL database with real crawled data. Treat e
 
 ### Stage Environment
 - `stage` is the staging branch for production-like testing.
+- Vercel uses the existing `encuentra24-api` project for both environments: `main` deploys to Production and `stage` deploys to the `stage` custom environment.
+- Do not create a separate Vercel project for staging unless the user explicitly changes this architecture.
 - The staging web deployment must use the staging PostgreSQL database only, never the production `DATABASE_URL`.
 - The production Coolify database is the source of truth; the stage database is disposable and can be wiped after explicit confirmation.
 - Do not run crawlers against production while testing staging changes unless the user explicitly asks for it.
