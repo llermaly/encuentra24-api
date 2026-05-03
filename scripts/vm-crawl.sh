@@ -13,6 +13,7 @@ LOG_DIR="$WORKDIR/data"
 TIMESTAMP=$(date '+%Y%m%d_%H%M%S')
 PANAMA_DAY_OF_WEEK=$(TZ=America/Panama date '+%u') # 1=Monday, 7=Sunday
 PANAMA_HOUR=$(TZ=America/Panama date '+%H')
+CRAWL_TIMEOUT_SECS="${CRAWL_TIMEOUT_SECS:-14400}"
 
 mkdir -p "$LOG_DIR"
 cd "$WORKDIR"
@@ -54,7 +55,7 @@ export DATABASE_URL
 
 # Run crawl as gustavo user
 echo "[$(date)] Running crawl..." >> "$LOGFILE" 2>&1
-su - gustavo -c "cd $WORKDIR && DATABASE_URL='$DATABASE_URL' timeout 7200 npx tsx src/index.ts crawl $CRAWL_ARGS" >> "$LOGFILE" 2>&1 || true
+su - gustavo -c "cd $WORKDIR && DATABASE_URL='$DATABASE_URL' timeout $CRAWL_TIMEOUT_SECS npx tsx src/index.ts crawl $CRAWL_ARGS" >> "$LOGFILE" 2>&1
 EXIT_CODE=$?
 
 echo "[$(date)] Crawl finished with exit code $EXIT_CODE" >> "$LOGFILE" 2>&1
