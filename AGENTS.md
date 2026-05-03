@@ -27,7 +27,7 @@ This app runs against a live PostgreSQL database with real crawled data. Treat e
 - The production Coolify database is the source of truth; the stage database is disposable and can be wiped after explicit confirmation.
 - Do not run crawlers against production while testing staging changes unless the user explicitly asks for it.
 - `coolify database list --format json` prints database passwords. Use it only when needed, never paste the secret values into chat, commits, logs, or docs.
-- Last verified prod-to-stage seed: 2026-05-03. Matching counts after restore: `listings` 97106, `price_history` 17836, `sellers` 1542, `crawl_runs` 1300, `crawl_errors` 3275.
+- Last verified prod-to-stage seed: 2026-05-03. Matching counts after restore: `listings` 97141, `price_history` 17836, `sellers` 1542, `crawl_runs` 1301, `crawl_errors` 3275.
 
 #### Wipe and Re-Seed Stage Database From Production
 Use this only for the stage database. These commands intentionally drop objects in the stage database, so verify both connection targets before running them.
