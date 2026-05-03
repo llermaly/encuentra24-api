@@ -17,7 +17,7 @@ This app runs against a live PostgreSQL database with real crawled data. Treat e
 - Vercel uses the existing `encuentra24-api` project for both environments: do not create a separate Vercel project for staging unless the user explicitly changes this architecture.
 - Vercel project details: project `encuentra24-api`, project id `prj_LccjoDXiORVjhSM2fWo5eUXtskQg`, team slug `my-team-43dbe230`, team id `team_AZDD5XdLKWjaDiWBNWcpKX2t`, root directory `web`, Node.js `24.x`, framework `Next.js`.
 - Vercel branch mapping: Production tracks `main`; custom environment `stage` tracks branch `stage` with matcher `{ type: "equals", pattern: "stage" }`.
-- Vercel stage environment: id `env_xb8IK0rFusqCHDjJRVtMapAiBR6z`; environment alias `https://encuentra24-api-env-stage-my-team-43dbe230.vercel.app`; deployment `dpl_DuhzT26BkJHVLCjdvvMC7GmC5wvx` was ready on 2026-05-03.
+- Vercel stage environment: id `env_xb8IK0rFusqCHDjJRVtMapAiBR6z`; stable environment alias `https://encuentra24-api-env-stage-my-team-43dbe230.vercel.app`. Deployment IDs change on every `stage` push; inspect the latest with `vercel inspect <deployment-id> --scope my-team-43dbe230` or `vercel api '/v6/deployments?projectId=prj_LccjoDXiORVjhSM2fWo5eUXtskQg&teamId=team_AZDD5XdLKWjaDiWBNWcpKX2t&limit=5'`.
 - Vercel stage env status as of 2026-05-03: `NEXT_PUBLIC_STACK_PROJECT_ID`, `NEXT_PUBLIC_STACK_PUBLISHABLE_CLIENT_KEY`, `STACK_SECRET_SERVER_KEY`, and `DATABASE_URL` are configured for `stage`.
 - Coolify server: UUID `r36ux4cb65rdjty4mfwzxddp`; API/panel host is the configured Coolify instance in `~/.config/coolify/config.json`.
 - Coolify project for this app: `Encuentra24`, UUID `e42ax6tdsu98817izek5cfld`, production environment UUID `dp0u9b5klwxms2gp4njlgxck`.
