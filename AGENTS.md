@@ -12,6 +12,63 @@ This app runs against a live PostgreSQL database with real crawled data. Treat e
 - **NEVER** suggest `git reset --hard`, `git clean -f`, or force-pushes
 - Before any schema change, confirm with the user — data loss is unrecoverable
 
+### Stage Environment
+- `stage` is the staging branch for production-like testing.
+- The staging web deployment must use the staging PostgreSQL database only, never the production `DATABASE_URL`.
+- The production Coolify database is the source of truth; the stage database is disposable and can be wiped after explicit confirmation.
+- Do not run crawlers against production while testing staging changes unless the user explicitly asks for it.
+
+#### Wipe and Re-Seed Stage Database From Production
+Use this only for the stage database. These commands intentionally drop objects in the stage database, so verify both connection targets before running them.
+
+1. Create a local PostgreSQL service file outside the repo:
+   ```ini
+   # ~/.config/encuentra24/pg_service.conf
+   [e24_prod]
+   host=<prod-db-host>
+   port=<prod-db-port>
+   dbname=encuentra24
+   user=encuentra24
+   password=<prod-password>
+   sslmode=disable
+
+   [e24_stage]
+   host=<stage-db-host>
+   port=<stage-db-port>
+   dbname=encuentra24_stage
+   user=encuentra24_stage
+   password=<stage-password>
+   sslmode=disable
+   ```
+   Then lock it down:
+   ```bash
+   chmod 600 ~/.config/encuentra24/pg_service.conf
+   ```
+
+2. Verify the endpoints without printing credentials:
+   ```bash
+   export PGSERVICEFILE="$HOME/.config/encuentra24/pg_service.conf"
+   psql service=e24_prod -c "select current_database(), current_user, inet_server_addr(), inet_server_port();"
+   psql service=e24_stage -c "select current_database(), current_user, inet_server_addr(), inet_server_port();"
+   ```
+
+3. Dump production to a local temporary file:
+   ```bash
+   pg_dump --format=custom --no-owner --no-acl --file=/tmp/encuentra24-prod.dump service=e24_prod
+   ```
+
+4. Wipe stage and restore the production dump into it:
+   ```bash
+   pg_restore --clean --if-exists --no-owner --no-acl --dbname=service=e24_stage /tmp/encuentra24-prod.dump
+   ```
+
+5. Validate row counts on stage before using it:
+   ```bash
+   psql service=e24_stage -c "select count(*) as listings from listings;"
+   psql service=e24_stage -c "select count(*) as price_history_rows from price_history;"
+   psql service=e24_stage -c "select count(*) as sellers from sellers;"
+   ```
+
 ### Verify Your Changes
 - After modifying any API route, trace every frontend component that consumes it and verify nothing breaks
 - After modifying a query, check all places that reference the same fields/aliases
