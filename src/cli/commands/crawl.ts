@@ -1,5 +1,6 @@
 import { Command } from 'commander';
 import { runCrawl } from '../../crawler/index.js';
+import { closeDb } from '../../db/connection.js';
 
 export const crawlCommand = new Command('crawl')
   .description('Crawl encuentra24.com listings')
@@ -32,6 +33,8 @@ export const crawlCommand = new Command('crawl')
       console.log('\nCrawl completed successfully.');
     } catch (error) {
       console.error('\nCrawl failed:', (error as Error).message);
-      process.exit(1);
+      process.exitCode = 1;
+    } finally {
+      await closeDb();
     }
   });
