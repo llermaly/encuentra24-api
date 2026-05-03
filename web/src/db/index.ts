@@ -5,7 +5,11 @@ import * as schema from './schema';
 
 const connectionString = process.env.DATABASE_URL || 'postgresql://encuentra24:encuentra24@localhost:5433/encuentra24';
 
-const client = postgres(connectionString);
+const client = postgres(connectionString, {
+  max: Number(process.env.POSTGRES_MAX_CONNECTIONS || 3),
+  idle_timeout: Number(process.env.POSTGRES_IDLE_TIMEOUT || 10),
+  connect_timeout: Number(process.env.POSTGRES_CONNECT_TIMEOUT || 10),
+});
 const pgDb = drizzle(client, { schema });
 
 interface DbWithAll {

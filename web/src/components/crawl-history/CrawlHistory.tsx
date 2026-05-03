@@ -161,6 +161,9 @@ export function CrawlHistory() {
       if (!res.ok) throw new Error('Failed to fetch');
       return res.json();
     },
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+    placeholderData: (previousData) => previousData,
   });
 
   if (isLoading || !data) {
