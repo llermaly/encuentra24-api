@@ -66,19 +66,14 @@ export function ListingFilters({ searchParams, onUpdate }: ListingFiltersProps) 
     <div className="aurora-surface rounded-2xl p-4 mb-4">
       <div className="flex flex-wrap gap-2.5 items-end">
         <div className="flex-1 min-w-[220px] flex gap-1.5">
-          <div className="relative flex-1">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5-5m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <input
-              type="text"
-              placeholder="Search by title or description…"
-              value={q}
-              onChange={e => setQ(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') submitSearch(); }}
-              className="aurora-input w-full pl-9"
-            />
-          </div>
+          <input
+            type="text"
+            placeholder="Search by title or description…"
+            value={q}
+            onChange={e => setQ(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') submitSearch(); }}
+            className="aurora-input flex-1"
+          />
           <button
             onClick={submitSearch}
             className="aurora-pill aurora-pill-primary"

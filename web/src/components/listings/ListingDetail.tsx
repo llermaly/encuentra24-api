@@ -259,7 +259,9 @@ export function ListingDetail({ listing, priceHistory, notes }: ListingDetailPro
       {/* Description */}
       {listing.description && (
         <Section title="Description">
-          <p className="text-sm text-stone-700 leading-relaxed whitespace-pre-line">{listing.description}</p>
+          <div className="aurora-surface rounded-2xl px-6 py-5">
+            <DescriptionBody text={listing.description} />
+          </div>
         </Section>
       )}
 
@@ -434,6 +436,40 @@ function Spec({ label, value }: { label: string; value: string | number | null |
     <div className="aurora-surface rounded-2xl px-4 py-3">
       <p className="text-[10px] uppercase tracking-wider text-stone-500 font-medium">{label}</p>
       <p className="font-serif text-xl text-stone-900 mt-0.5 tabular-nums">{value}</p>
+    </div>
+  );
+}
+
+function DescriptionBody({ text }: { text: string }) {
+  const blocks = text
+    .replace(/\r\n/g, '\n')
+    .split(/\n{2,}/)
+    .map(b => b.trim())
+    .filter(Boolean);
+
+  return (
+    <div className="space-y-3 text-[15px] text-stone-700 leading-relaxed">
+      {blocks.map((block, i) => {
+        const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
+        const looksLikeList = lines.length > 1 && lines.every(l => l.length < 80);
+        if (looksLikeList) {
+          return (
+            <ul key={i} className="space-y-1">
+              {lines.map((line, j) => (
+                <li key={j} className="flex gap-2.5">
+                  <span aria-hidden className="mt-2 w-1 h-1 rounded-full bg-stone-400 shrink-0" />
+                  <span>{line}</span>
+                </li>
+              ))}
+            </ul>
+          );
+        }
+        return (
+          <p key={i} className="whitespace-pre-line">
+            {block}
+          </p>
+        );
+      })}
     </div>
   );
 }

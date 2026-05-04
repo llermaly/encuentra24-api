@@ -161,18 +161,13 @@ export function AgentLeaderboard() {
           </button>
         </div>
 
-        <div className="relative flex-1 min-w-[200px]">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5-5m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          <input
-            type="text"
-            placeholder={view === 'agencies' ? 'Search agencies…' : 'Search agents…'}
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="aurora-input w-full pl-9"
-          />
-        </div>
+        <input
+          type="text"
+          placeholder={view === 'agencies' ? 'Search agencies…' : 'Search agents…'}
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="aurora-input flex-1 min-w-[200px]"
+        />
 
         <LocationCombobox
           locations={data?.locations || []}
