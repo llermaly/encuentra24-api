@@ -16,9 +16,35 @@ interface CategoriesData {
   locations: Array<{ location: string; count: number }>;
 }
 
+type FilterValues = Record<string, string>;
+
+const FILTER_KEYS = [
+  'q', 'location', 'category', 'subcategory', 'city', 'province',
+  'priceMin', 'priceMax',
+  'bedroomsMin', 'bedroomsMax', 'bathroomsMin',
+  'areaMin', 'areaMax', 'landAreaMin', 'landAreaMax',
+  'status', 'isFavorite', 'inPipeline',
+] as const;
+
+function paramsToObject(searchParams: URLSearchParams): FilterValues {
+  const obj: FilterValues = {};
+  for (const key of FILTER_KEYS) {
+    const v = searchParams.get(key);
+    if (v) obj[key] = v;
+  }
+  return obj;
+}
+
 export function ListingFilters({ searchParams, onUpdate }: ListingFiltersProps) {
-  const [q, setQ] = useState(searchParams.get('q') || '');
+  const paramsKey = searchParams.toString();
+  const [staged, setStaged] = useState<FilterValues>(() => paramsToObject(searchParams));
   const [expanded, setExpanded] = useState(false);
+
+  // Sync local staging state when the URL changes externally (chip removal,
+  // saved-search application, etc.). The string key avoids object identity churn.
+  useEffect(() => {
+    setStaged(paramsToObject(new URLSearchParams(paramsKey)));
+  }, [paramsKey]);
 
   const { data: catData } = useQuery<CategoriesData>({
     queryKey: ['categories'],
@@ -30,20 +56,40 @@ export function ListingFilters({ searchParams, onUpdate }: ListingFiltersProps) 
     staleTime: 5 * 60 * 1000,
   });
 
-  useEffect(() => {
-    setQ(searchParams.get('q') || '');
-  }, [searchParams]);
+  const setField = useCallback((key: string, value: string | undefined) => {
+    setStaged(prev => {
+      const next = { ...prev };
+      if (value == null || value === '') delete next[key];
+      else next[key] = value;
+      return next;
+    });
+  }, []);
 
-  const submitSearch = () => {
-    const current = searchParams.get('q') || '';
-    if (q !== current) {
-      onUpdate({ q: q || undefined });
+  const applied = useMemo(() => paramsToObject(new URLSearchParams(paramsKey)), [paramsKey]);
+  const pendingCount = useMemo(() => {
+    const allKeys = new Set([...Object.keys(staged), ...Object.keys(applied)]);
+    let count = 0;
+    for (const k of allKeys) if (staged[k] !== applied[k]) count++;
+    return count;
+  }, [staged, applied]);
+
+  const applyFilters = useCallback(() => {
+    if (pendingCount === 0) return;
+    const updates: Record<string, string | undefined> = {};
+    const allKeys = new Set([...Object.keys(staged), ...Object.keys(applied)]);
+    for (const k of allKeys) {
+      if (staged[k] !== applied[k]) updates[k] = staged[k] || undefined;
     }
-  };
+    onUpdate(updates);
+  }, [staged, applied, pendingCount, onUpdate]);
+
+  const resetStaged = useCallback(() => {
+    setStaged(applied);
+  }, [applied]);
 
   const onLocationChange = useCallback(
-    (v: string) => onUpdate({ location: v || undefined }),
-    [onUpdate]
+    (v: string) => setField('location', v || undefined),
+    [setField]
   );
 
   const locationOptions = useMemo(
@@ -65,39 +111,31 @@ export function ListingFilters({ searchParams, onUpdate }: ListingFiltersProps) 
   return (
     <div className="aurora-surface rounded-2xl p-4 mb-4">
       <div className="flex flex-wrap gap-2.5 items-end">
-        <div className="flex-1 min-w-[220px] flex gap-1.5">
-          <input
-            type="text"
-            placeholder="Search by title or description…"
-            value={q}
-            onChange={e => setQ(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') submitSearch(); }}
-            className="aurora-input flex-1"
-          />
-          <button
-            onClick={submitSearch}
-            className="aurora-pill aurora-pill-primary"
-          >
-            Search
-          </button>
-        </div>
+        <input
+          type="text"
+          placeholder="Search by title or description…"
+          value={staged.q || ''}
+          onChange={e => setField('q', e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') applyFilters(); }}
+          className="aurora-input flex-1 min-w-[220px]"
+        />
         <SearchableSelect
           placeholder="All Locations"
-          value={searchParams.get('location') || ''}
+          value={staged.location || ''}
           options={locationOptions}
           onChange={onLocationChange}
         />
         <SelectFilter
           label="Categories"
-          value={searchParams.get('category') || ''}
+          value={staged.category || ''}
           options={CATEGORY_OPTIONS as unknown as Array<{ value: string; label: string }>}
-          onChange={v => onUpdate({ category: v || undefined })}
+          onChange={v => setField('category', v || undefined)}
         />
         <SelectFilter
           label="Types"
-          value={searchParams.get('subcategory') || ''}
+          value={staged.subcategory || ''}
           options={SUBCATEGORY_OPTIONS as unknown as Array<{ value: string; label: string }>}
-          onChange={v => onUpdate({ subcategory: v || undefined })}
+          onChange={v => setField('subcategory', v || undefined)}
         />
         <button
           onClick={() => setExpanded(!expanded)}
@@ -108,42 +146,65 @@ export function ListingFilters({ searchParams, onUpdate }: ListingFiltersProps) 
           </svg>
           {expanded ? 'Less filters' : 'More filters'}
         </button>
+        <div className="flex items-center gap-1.5 ml-auto">
+          {pendingCount > 0 && (
+            <button
+              onClick={resetStaged}
+              className="aurora-pill aurora-pill-ghost"
+              type="button"
+            >
+              Reset
+            </button>
+          )}
+          <button
+            onClick={applyFilters}
+            disabled={pendingCount === 0}
+            className={pendingCount > 0 ? 'aurora-pill aurora-pill-primary' : 'aurora-pill aurora-pill-ghost'}
+            type="button"
+          >
+            Apply{pendingCount > 0 ? ` (${pendingCount})` : ''}
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {expanded && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 pt-4 border-t border-stone-200/60">
           <RangeFilter
             label="Price"
-            minValue={searchParams.get('priceMin') || ''}
-            maxValue={searchParams.get('priceMax') || ''}
-            onMinChange={v => onUpdate({ priceMin: v || undefined })}
-            onMaxChange={v => onUpdate({ priceMax: v || undefined })}
+            minValue={staged.priceMin || ''}
+            maxValue={staged.priceMax || ''}
+            onMinChange={v => setField('priceMin', v || undefined)}
+            onMaxChange={v => setField('priceMax', v || undefined)}
           />
           <RangeFilter
             label="Bedrooms"
-            minValue={searchParams.get('bedroomsMin') || ''}
-            maxValue={searchParams.get('bedroomsMax') || ''}
-            onMinChange={v => onUpdate({ bedroomsMin: v || undefined })}
-            onMaxChange={v => onUpdate({ bedroomsMax: v || undefined })}
+            minValue={staged.bedroomsMin || ''}
+            maxValue={staged.bedroomsMax || ''}
+            onMinChange={v => setField('bedroomsMin', v || undefined)}
+            onMaxChange={v => setField('bedroomsMax', v || undefined)}
           />
           <RangeFilter
             label="Area (m²)"
-            minValue={searchParams.get('areaMin') || ''}
-            maxValue={searchParams.get('areaMax') || ''}
-            onMinChange={v => onUpdate({ areaMin: v || undefined })}
-            onMaxChange={v => onUpdate({ areaMax: v || undefined })}
+            minValue={staged.areaMin || ''}
+            maxValue={staged.areaMax || ''}
+            onMinChange={v => setField('areaMin', v || undefined)}
+            onMaxChange={v => setField('areaMax', v || undefined)}
           />
-          <DebouncedNumberInput
-            label="Bathrooms Min"
-            value={searchParams.get('bathroomsMin') || ''}
-            onChange={v => onUpdate({ bathroomsMin: v || undefined })}
+          <NumberField
+            label="Bathrooms min"
+            value={staged.bathroomsMin || ''}
+            onChange={v => setField('bathroomsMin', v || undefined)}
             min="0"
+            onSubmit={applyFilters}
           />
           <div>
             <label className="block text-[11px] uppercase tracking-wider text-stone-500 mb-1.5 font-medium">City</label>
             <select
-              value={searchParams.get('city') || ''}
-              onChange={e => onUpdate({ city: e.target.value || undefined })}
+              value={staged.city || ''}
+              onChange={e => setField('city', e.target.value || undefined)}
               className="aurora-input w-full"
             >
               <option value="">All Cities</option>
@@ -154,16 +215,16 @@ export function ListingFilters({ searchParams, onUpdate }: ListingFiltersProps) 
           </div>
           <RangeFilter
             label="Land Area (m²)"
-            minValue={searchParams.get('landAreaMin') || ''}
-            maxValue={searchParams.get('landAreaMax') || ''}
-            onMinChange={v => onUpdate({ landAreaMin: v || undefined })}
-            onMaxChange={v => onUpdate({ landAreaMax: v || undefined })}
+            minValue={staged.landAreaMin || ''}
+            maxValue={staged.landAreaMax || ''}
+            onMinChange={v => setField('landAreaMin', v || undefined)}
+            onMaxChange={v => setField('landAreaMax', v || undefined)}
           />
           <div>
             <label className="block text-[11px] uppercase tracking-wider text-stone-500 mb-1.5 font-medium">Status</label>
             <select
-              value={searchParams.get('status') || 'active'}
-              onChange={e => onUpdate({ status: e.target.value === 'active' ? undefined : e.target.value })}
+              value={staged.status || 'active'}
+              onChange={e => setField('status', e.target.value === 'active' ? undefined : e.target.value)}
               className="aurora-input w-full"
             >
               <option value="active">Active only</option>
@@ -172,20 +233,20 @@ export function ListingFilters({ searchParams, onUpdate }: ListingFiltersProps) 
             </select>
           </div>
           <div className="flex items-end gap-4">
-            <label className="flex items-center gap-1.5 text-sm text-gray-700">
+            <label className="flex items-center gap-1.5 text-sm text-stone-700">
               <input
                 type="checkbox"
-                checked={searchParams.get('isFavorite') === 'true'}
-                onChange={e => onUpdate({ isFavorite: e.target.checked ? 'true' : undefined })}
+                checked={staged.isFavorite === 'true'}
+                onChange={e => setField('isFavorite', e.target.checked ? 'true' : undefined)}
                 className="rounded"
               />
               Favorites only
             </label>
-            <label className="flex items-center gap-1.5 text-sm text-gray-700">
+            <label className="flex items-center gap-1.5 text-sm text-stone-700">
               <input
                 type="checkbox"
-                checked={searchParams.get('inPipeline') === 'true'}
-                onChange={e => onUpdate({ inPipeline: e.target.checked ? 'true' : undefined })}
+                checked={staged.inPipeline === 'true'}
+                onChange={e => setField('inPipeline', e.target.checked ? 'true' : undefined)}
                 className="rounded"
               />
               In Pipeline
@@ -324,24 +385,6 @@ function RangeFilter({
   onMinChange: (value: string) => void;
   onMaxChange: (value: string) => void;
 }) {
-  const [localMin, setLocalMin] = useState(minValue);
-  const [localMax, setLocalMax] = useState(maxValue);
-
-  useEffect(() => { setLocalMin(minValue); }, [minValue]);
-  useEffect(() => { setLocalMax(maxValue); }, [maxValue]);
-
-  useEffect(() => {
-    if (localMin === minValue) return;
-    const timer = setTimeout(() => onMinChange(localMin), 400);
-    return () => clearTimeout(timer);
-  }, [localMin]);
-
-  useEffect(() => {
-    if (localMax === maxValue) return;
-    const timer = setTimeout(() => onMaxChange(localMax), 400);
-    return () => clearTimeout(timer);
-  }, [localMax]);
-
   return (
     <div>
       <label className="block text-[11px] uppercase tracking-wider text-stone-500 mb-1.5 font-medium">{label}</label>
@@ -349,15 +392,15 @@ function RangeFilter({
         <input
           type="number"
           placeholder="Min"
-          value={localMin}
-          onChange={e => setLocalMin(e.target.value)}
+          value={minValue}
+          onChange={e => onMinChange(e.target.value)}
           className="aurora-input w-1/2 placeholder:text-stone-400"
         />
         <input
           type="number"
           placeholder="Max"
-          value={localMax}
-          onChange={e => setLocalMax(e.target.value)}
+          value={maxValue}
+          onChange={e => onMaxChange(e.target.value)}
           className="aurora-input w-1/2 placeholder:text-stone-400"
         />
       </div>
@@ -365,34 +408,27 @@ function RangeFilter({
   );
 }
 
-function DebouncedNumberInput({
+function NumberField({
   label,
   value,
   onChange,
   min,
+  onSubmit,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   min?: string;
+  onSubmit?: () => void;
 }) {
-  const [local, setLocal] = useState(value);
-
-  useEffect(() => { setLocal(value); }, [value]);
-
-  useEffect(() => {
-    if (local === value) return;
-    const timer = setTimeout(() => onChange(local), 400);
-    return () => clearTimeout(timer);
-  }, [local]);
-
   return (
     <div>
       <label className="block text-[11px] uppercase tracking-wider text-stone-500 mb-1.5 font-medium">{label}</label>
       <input
         type="number"
-        value={local}
-        onChange={e => setLocal(e.target.value)}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter' && onSubmit) onSubmit(); }}
         className="aurora-input w-full"
         min={min}
       />
