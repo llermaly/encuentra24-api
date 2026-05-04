@@ -102,14 +102,6 @@ export default function SavedSearchesPage() {
     },
   });
 
-  const refreshMutation = useMutation({
-    mutationFn: () => fetch('/api/saved-searches/check-all', { method: 'POST' }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['saved-searches'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard', 'searches'] });
-    },
-  });
-
   function applySearch(filtersJson: string) {
     const params = getSearchParams(filtersJson);
     router.push(`/listings?${params.toString()}`);
@@ -126,35 +118,23 @@ export default function SavedSearchesPage() {
   return (
     <div className="px-6 md:px-10 py-8 max-w-[1300px] mx-auto">
       {/* Hero */}
-      <div className="flex flex-wrap items-end justify-between gap-4 mb-8">
-        <div>
-          <p className="text-[11px] uppercase tracking-[0.3em] text-stone-500 font-medium">Watching</p>
-          <h1 className="font-serif text-4xl md:text-5xl font-light tracking-tight text-stone-900 mt-1.5">
-            Saved <span className="italic">searches</span>
-          </h1>
-          <p className="text-sm text-stone-500 mt-2">
-            {isLoading ? 'Loading…' : searches.length === 0
-              ? 'Save filters from the browse page to follow new matches.'
-              : (
-                <>
-                  {searches.length} active {searches.length === 1 ? 'search' : 'searches'}
-                  {totalNew > 0 && (
-                    <span className="ml-2 aurora-chip aurora-chip-mint">+{totalNew} new since last check</span>
-                  )}
-                </>
-              )}
-          </p>
-        </div>
-        <button
-          onClick={() => refreshMutation.mutate()}
-          disabled={refreshMutation.isPending || searches.length === 0}
-          className="aurora-pill aurora-pill-primary disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          <svg className={`w-3.5 h-3.5 ${refreshMutation.isPending ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h5M20 20v-5h-5M5 9a8 8 0 0114-3M19 15a8 8 0 01-14 3" />
-          </svg>
-          {refreshMutation.isPending ? 'Checking…' : 'Check for new'}
-        </button>
+      <div className="mb-8">
+        <p className="text-[11px] uppercase tracking-[0.3em] text-stone-500 font-medium">Watching</p>
+        <h1 className="font-serif text-4xl md:text-5xl font-light tracking-tight text-stone-900 mt-1.5">
+          Saved <span className="italic">searches</span>
+        </h1>
+        <p className="text-sm text-stone-500 mt-2">
+          {isLoading ? 'Loading…' : searches.length === 0
+            ? 'Save filters from the browse page to follow new matches.'
+            : (
+              <>
+                {searches.length} active {searches.length === 1 ? 'search' : 'searches'}
+                {totalNew > 0 && (
+                  <span className="ml-2 aurora-chip aurora-chip-mint">+{totalNew} new since last check</span>
+                )}
+              </>
+            )}
+        </p>
       </div>
 
       {isLoading ? (
@@ -200,10 +180,7 @@ export default function SavedSearchesPage() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <h2 className="font-serif text-2xl text-stone-900">{search.name}</h2>
                       {newSinceCrawl > 0 && (
-                        <span
-                          className="aurora-chip text-white"
-                          style={{ background: 'linear-gradient(135deg, #4a6b4a, #1a1a1a)', borderColor: 'transparent' }}
-                        >
+                        <span className="aurora-chip aurora-chip-ink">
                           +{newSinceCrawl} new
                         </span>
                       )}
