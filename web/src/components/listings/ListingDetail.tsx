@@ -10,7 +10,7 @@ import { PriceHistoryChart } from './PriceHistoryChart';
 
 const DetailMap = dynamic(
   () => import('./DetailMap').then(m => ({ default: m.DetailMap })),
-  { ssr: false, loading: () => <div className="w-full h-64 bg-gray-100 animate-pulse rounded-lg" /> }
+  { ssr: false, loading: () => <div className="w-full h-64 rounded-2xl aurora-surface animate-pulse" /> }
 );
 
 interface PriceHistoryEntry {
@@ -134,86 +134,120 @@ export function ListingDetail({ listing, priceHistory, notes }: ListingDetailPro
     setNoteText('');
   }
 
+  const placeText = [listing.location, listing.city, listing.province].filter(Boolean).join(' · ');
+  const priceDropPct =
+    listing.oldPrice && listing.price && listing.oldPrice > listing.price
+      ? Math.round(((listing.oldPrice - listing.price) / listing.oldPrice) * 100)
+      : null;
+
   return (
-    <div className="p-6 max-w-5xl mx-auto">
-      <div className="mb-4">
-        <button onClick={() => router.back()} className="text-sm text-blue-600 hover:underline">
-          &larr; Back to listings
-        </button>
-      </div>
+    <div className="px-6 md:px-10 py-8 max-w-5xl mx-auto">
+      {/* Back */}
+      <button
+        onClick={() => router.back()}
+        className="aurora-pill aurora-pill-ghost mb-5"
+      >
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+        </svg>
+        Back to listings
+      </button>
 
       {/* Image Gallery */}
       {listing.images && listing.images.length > 0 && (
-        <ImageGallery images={listing.images} title={listing.title || ''} />
+        <div className="rounded-3xl overflow-hidden aurora-surface">
+          <ImageGallery images={listing.images} title={listing.title || ''} />
+        </div>
       )}
 
       {/* Header */}
-      <div className="flex items-start justify-between mt-4 gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            {formatPrice(listing.price, listing.currency || 'USD')}
+      <div className="mt-6 flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] uppercase tracking-[0.3em] text-stone-500 font-medium capitalize">
+            {listing.category} · {listing.subcategory.replace(/-/g, ' ')}
+          </p>
+          <div className="flex flex-wrap items-baseline gap-3 mt-2">
+            <h1 className="font-serif text-4xl md:text-5xl font-light tracking-tight text-stone-900">
+              {formatPrice(listing.price, listing.currency || 'USD')}
+            </h1>
             {listing.oldPrice && listing.oldPrice > (listing.price || 0) && (
-              <span className="ml-2 text-lg line-through text-gray-400 font-normal">
+              <span className="text-lg line-through text-stone-400">
                 {formatPrice(listing.oldPrice)}
               </span>
             )}
-          </h1>
-          <p className="text-gray-700 mt-1">{listing.title}</p>
-          <p className="text-sm text-gray-500 mt-0.5">
-            {[listing.location, listing.city, listing.province].filter(Boolean).join(', ')}
-          </p>
+            {priceDropPct != null && (
+              <span className="aurora-chip aurora-chip-mint">↓ {priceDropPct}%</span>
+            )}
+            {listing.featureLevel && listing.featureLevel !== 'basic' && (
+              <span className="aurora-chip aurora-chip-sand capitalize">★ {listing.featureLevel}</span>
+            )}
+          </div>
+          <p className="text-stone-700 mt-2 text-lg">{listing.title || '—'}</p>
+          {placeText && <p className="text-sm text-stone-500 mt-1">{placeText}</p>}
+          {(listing.pricePerSqmConstruction || listing.pricePerSqmLand) && (
+            <div className="flex flex-wrap gap-2 mt-3">
+              {listing.pricePerSqmConstruction != null && (
+                <span className="aurora-chip aurora-chip-slate">
+                  ${Math.round(listing.pricePerSqmConstruction).toLocaleString()}/m² built
+                </span>
+              )}
+              {listing.pricePerSqmLand != null && (
+                <span className="aurora-chip aurora-chip-sand">
+                  ${Math.round(listing.pricePerSqmLand).toLocaleString()}/m² land
+                </span>
+              )}
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={toggleFavorite}
-            className={`p-2 rounded-full border ${isFav ? 'text-red-500 border-red-200 bg-red-50' : 'text-gray-400 border-gray-200 hover:bg-gray-50'}`}
+            aria-label={isFav ? 'Unfavorite' : 'Favorite'}
+            className={`aurora-pill ${isFav ? 'aurora-pill-primary' : 'aurora-pill-ghost'}`}
           >
-            <svg className="w-5 h-5" fill={isFav ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+            <svg className="w-3.5 h-3.5" fill={isFav ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
             </svg>
+            {isFav ? 'Saved' : 'Save'}
           </button>
           <a
             href={listing.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="px-3 py-1.5 text-sm border rounded hover:bg-gray-50"
+            className="aurora-pill aurora-pill-ghost"
           >
             View on E24
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M14 5h5m0 0v5m0-5L10 14M5 5v14h14" />
+            </svg>
           </a>
         </div>
       </div>
 
-      {/* Specs Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
-        <Spec label="Bedrooms" value={listing.bedrooms} />
-        <Spec label="Bathrooms" value={listing.bathrooms} />
-        <Spec label="Parking" value={listing.parking} />
-        <Spec label="Built Area" value={listing.builtAreaSqm ? formatArea(listing.builtAreaSqm) : null} />
-        <Spec label="Land Area" value={listing.landAreaSqm ? formatArea(listing.landAreaSqm) : null} />
-        <Spec label="Year Built" value={listing.yearBuilt} />
-        <Spec label="Levels" value={listing.levels} />
-        <Spec label="Floor" value={listing.floorNumber} />
+      {/* Specs */}
+      <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Spec label="Bedrooms" value={listing.bedrooms} icon="bd" />
+        <Spec label="Bathrooms" value={listing.bathrooms} icon="ba" />
+        <Spec label="Parking" value={listing.parking} icon="p" />
+        <Spec label="Built Area" value={listing.builtAreaSqm ? formatArea(listing.builtAreaSqm) : null} icon="a" />
+        <Spec label="Land Area" value={listing.landAreaSqm ? formatArea(listing.landAreaSqm) : null} icon="l" />
+        <Spec label="Year Built" value={listing.yearBuilt} icon="y" />
+        <Spec label="Levels" value={listing.levels} icon="lv" />
+        <Spec label="Floor" value={listing.floorNumber} icon="f" />
       </div>
 
-      {/* Price per m² */}
-      {(listing.pricePerSqmConstruction || listing.pricePerSqmLand) && (
-        <div className="flex gap-4 mt-3 text-sm text-gray-600">
-          {listing.pricePerSqmConstruction && (
-            <span>${listing.pricePerSqmConstruction.toLocaleString()}/m² built</span>
-          )}
-          {listing.pricePerSqmLand && (
-            <span>${listing.pricePerSqmLand.toLocaleString()}/m² land</span>
-          )}
-        </div>
-      )}
-
       {/* Pipeline Stage */}
-      <div className="mt-4 flex items-center gap-2">
-        <label className="text-sm text-gray-600">Pipeline:</label>
+      <div className="mt-6 aurora-surface rounded-2xl px-5 py-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-[11px] uppercase tracking-wider text-stone-500 font-medium">Your pipeline</p>
+          <p className="font-serif text-lg text-stone-900 mt-0.5">
+            {stage ? PIPELINE_STAGE_LABELS[stage as keyof typeof PIPELINE_STAGE_LABELS] || stage : 'Not in pipeline'}
+          </p>
+        </div>
         <select
           value={stage || ''}
           onChange={e => updateStage(e.target.value)}
-          className="px-2 py-1 text-sm border rounded bg-white"
+          className="aurora-input"
         >
           <option value="">Not in pipeline</option>
           {PIPELINE_STAGES.map(s => (
@@ -224,151 +258,227 @@ export function ListingDetail({ listing, priceHistory, notes }: ListingDetailPro
 
       {/* Description */}
       {listing.description && (
-        <div className="mt-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-2">Description</h2>
-          <p className="text-sm text-gray-700 whitespace-pre-line">{listing.description}</p>
-        </div>
+        <Section title="Description">
+          <div className="aurora-surface rounded-2xl px-6 py-5">
+            <DescriptionBody text={listing.description} />
+          </div>
+        </Section>
       )}
 
-      {/* Location Map */}
+      {/* Map */}
       {listing.latitude != null && listing.longitude != null && (
-        <div className="mt-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-2">Location</h2>
-          <DetailMap
-            latitude={listing.latitude}
-            longitude={listing.longitude}
-            title={listing.title || listing.location || 'Property'}
-          />
-          <div className="flex items-center gap-3 mt-2">
+        <Section title="Location">
+          <div className="rounded-2xl overflow-hidden aurora-surface">
+            <DetailMap
+              latitude={listing.latitude}
+              longitude={listing.longitude}
+              title={listing.title || listing.location || 'Property'}
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-3 mt-3">
             {listing.address && (
-              <p className="text-sm text-gray-500">{listing.address}</p>
+              <p className="text-sm text-stone-600">{listing.address}</p>
             )}
             <a
               href={`https://www.google.com/maps?q=${listing.latitude},${listing.longitude}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-blue-600 hover:underline shrink-0"
+              className="text-sm text-stone-700 hover:text-stone-900 underline-offset-4 hover:underline ml-auto"
             >
-              Open in Google Maps
+              Open in Google Maps →
             </a>
           </div>
-        </div>
+        </Section>
       )}
 
       {/* Amenities */}
       {listing.amenities && listing.amenities.length > 0 && (
-        <div className="mt-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-2">Amenities</h2>
+        <Section title="Amenities">
           <div className="flex flex-wrap gap-2">
             {listing.amenities.map((a, i) => (
-              <span key={i} className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
-                {a}
-              </span>
+              <span key={i} className="aurora-chip">{a}</span>
             ))}
           </div>
-        </div>
+        </Section>
       )}
 
-      {/* Seller Info */}
-      <div className="mt-6 bg-gray-50 rounded-lg p-4">
-        <h2 className="text-lg font-semibold text-gray-900 mb-2">Seller</h2>
-        <div className="text-sm text-gray-700 space-y-1">
-          {listing.agentName && (
-            <p className="font-medium">{listing.agentName}</p>
-          )}
-          {listing.sellerName && (
-            <p className={listing.agentName ? 'text-gray-500' : ''}>{listing.sellerName}</p>
-          )}
-          {listing.sellerType && <p className="text-gray-500">{listing.sellerType}</p>}
-          {listing.sellerVerified && <span className="text-green-600 text-xs">Verified</span>}
-        </div>
-        {listing.sellerWhatsapp && (
-          <a
-            href={`https://wa.me/${listing.sellerWhatsapp}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 mt-3 px-4 py-2 bg-green-500 text-white text-sm font-medium rounded-lg hover:bg-green-600 transition-colors"
+      {/* Seller */}
+      <Section title="Seller">
+        <div className="aurora-surface rounded-2xl p-5 flex flex-wrap items-start gap-4">
+          <span
+            className="w-12 h-12 rounded-full flex items-center justify-center font-serif text-xl text-stone-700 shrink-0"
+            style={{ background: 'linear-gradient(135deg, #ecf3ec, #ebe4cd)' }}
           >
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
-            </svg>
-            WhatsApp
-          </a>
-        )}
-      </div>
-
-      {/* Dates */}
-      <div className="mt-4 text-xs text-gray-400 space-y-1">
-        <p>Published: {formatDate(listing.publishedAt)}</p>
-        <p>First seen: {formatDate(listing.firstSeenAt)}</p>
-        <p>Last seen: {formatRelativeDate(listing.lastSeenAt)}</p>
-        {listing.titleStatus && <p>Title status: {listing.titleStatus}</p>}
-        {listing.maintenanceCost && <p>Maintenance: {formatPrice(listing.maintenanceCost)}/mo</p>}
-        {listing.favoritesCount != null && <p>E24 favorites: {listing.favoritesCount}</p>}
-      </div>
+            {(listing.agentName || listing.sellerName || '?').charAt(0).toUpperCase()}
+          </span>
+          <div className="flex-1 min-w-0">
+            {listing.agentName && (
+              <p className="font-serif text-lg text-stone-900">{listing.agentName}</p>
+            )}
+            {listing.sellerName && (
+              <p className={`text-sm ${listing.agentName ? 'text-stone-500' : 'font-serif text-lg text-stone-900'}`}>
+                {listing.sellerName}
+              </p>
+            )}
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {listing.sellerType && <span className="aurora-chip capitalize">{listing.sellerType}</span>}
+              {listing.sellerVerified && (
+                <span className="aurora-chip aurora-chip-slate">
+                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  Verified
+                </span>
+              )}
+            </div>
+          </div>
+          {listing.sellerWhatsapp && (
+            <a
+              href={`https://wa.me/${listing.sellerWhatsapp}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500 text-white text-sm font-medium hover:bg-emerald-600 hover:-translate-y-0.5 transition-all shadow-md shadow-emerald-200"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+              </svg>
+              WhatsApp
+            </a>
+          )}
+        </div>
+      </Section>
 
       {/* Price History */}
       {priceHistory.length > 0 && (
-        <div className="mt-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-2">Price History</h2>
-          <PriceHistoryChart data={priceHistory} currentPrice={listing.price} />
-          <div className="space-y-2 mt-3">
-            {priceHistory.map(ph => (
-              <div key={ph.id} className="flex justify-between items-center text-sm py-1 border-b last:border-0">
-                <span className="text-gray-700">{formatPrice(ph.price)}</span>
-                <span className="text-gray-400 text-xs">{formatDate(ph.recordedAt)}</span>
-              </div>
-            ))}
+        <Section title="Price History">
+          <div className="aurora-surface rounded-2xl p-5">
+            <PriceHistoryChart data={priceHistory} currentPrice={listing.price} />
+            <div className="mt-3 divide-y divide-stone-200/60">
+              {priceHistory.map(ph => (
+                <div key={ph.id} className="flex justify-between items-center text-sm py-2">
+                  <span className="font-serif text-stone-900">{formatPrice(ph.price)}</span>
+                  <span className="text-stone-400 text-xs">{formatDate(ph.recordedAt)}</span>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        </Section>
       )}
 
       {/* Notes */}
-      <div className="mt-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-2">Notes</h2>
+      <Section title="Notes">
         <div className="flex gap-2 mb-3">
           <input
             type="text"
-            placeholder="Add a note..."
+            placeholder="Add a private note…"
             value={noteText}
             onChange={e => setNoteText(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && addNote()}
-            className="flex-1 px-3 py-1.5 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="aurora-input flex-1"
           />
           <button
             onClick={addNote}
             disabled={!noteText.trim()}
-            className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+            className="aurora-pill aurora-pill-primary disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Add
           </button>
         </div>
         {localNotes.length === 0 ? (
-          <p className="text-sm text-gray-500">No notes yet.</p>
+          <p className="text-sm text-stone-500 italic">No notes yet.</p>
         ) : (
           <div className="space-y-2">
             {localNotes.map(note => (
-              <div key={note.id} className="bg-gray-50 rounded p-3">
-                <p className="text-sm text-gray-700">{note.content}</p>
-                <p className="text-xs text-gray-400 mt-1">
-                  {note.type !== 'note' && <span className="capitalize mr-2">{note.type.replace('_', ' ')}</span>}
-                  {formatRelativeDate(note.createdAt)}
+              <div key={note.id} className="aurora-surface-soft rounded-2xl p-4">
+                <p className="text-sm text-stone-800 leading-relaxed">{note.content}</p>
+                <p className="text-xs text-stone-500 mt-2 flex items-center gap-2">
+                  {note.type !== 'note' && (
+                    <span className="aurora-chip capitalize">{note.type.replace('_', ' ')}</span>
+                  )}
+                  <span>{formatRelativeDate(note.createdAt)}</span>
                 </p>
               </div>
             ))}
           </div>
         )}
+      </Section>
+
+      {/* Meta */}
+      <div className="mt-8 aurora-surface-soft rounded-2xl p-5">
+        <p className="text-[11px] uppercase tracking-wider text-stone-500 font-medium mb-2">Meta</p>
+        <dl className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-1.5 text-xs text-stone-600">
+          <MetaRow label="Published" value={formatDate(listing.publishedAt)} />
+          <MetaRow label="First seen" value={formatDate(listing.firstSeenAt)} />
+          <MetaRow label="Last seen" value={formatRelativeDate(listing.lastSeenAt)} />
+          {listing.titleStatus && <MetaRow label="Title" value={listing.titleStatus} />}
+          {listing.maintenanceCost != null && <MetaRow label="Maintenance" value={`${formatPrice(listing.maintenanceCost)}/mo`} />}
+          {listing.favoritesCount != null && <MetaRow label="E24 favorites" value={String(listing.favoritesCount)} />}
+        </dl>
       </div>
     </div>
   );
 }
 
-function Spec({ label, value }: { label: string; value: string | number | null | undefined }) {
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="mt-8">
+      <h2 className="font-serif text-xl text-stone-900 mb-3">
+        <span className="aurora-rule">{title}</span>
+      </h2>
+      {children}
+    </section>
+  );
+}
+
+function Spec({ label, value }: { label: string; value: string | number | null | undefined; icon?: string }) {
   if (value == null) return null;
   return (
-    <div className="bg-gray-50 rounded p-2">
-      <p className="text-xs text-gray-500">{label}</p>
-      <p className="text-sm font-medium text-gray-900">{value}</p>
+    <div className="aurora-surface rounded-2xl px-4 py-3">
+      <p className="text-[10px] uppercase tracking-wider text-stone-500 font-medium">{label}</p>
+      <p className="font-serif text-xl text-stone-900 mt-0.5 tabular-nums">{value}</p>
+    </div>
+  );
+}
+
+function DescriptionBody({ text }: { text: string }) {
+  const blocks = text
+    .replace(/\r\n/g, '\n')
+    .split(/\n{2,}/)
+    .map(b => b.trim())
+    .filter(Boolean);
+
+  return (
+    <div className="space-y-3 text-[15px] text-stone-700 leading-relaxed">
+      {blocks.map((block, i) => {
+        const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
+        const looksLikeList = lines.length > 1 && lines.every(l => l.length < 80);
+        if (looksLikeList) {
+          return (
+            <ul key={i} className="space-y-1">
+              {lines.map((line, j) => (
+                <li key={j} className="flex gap-2.5">
+                  <span aria-hidden className="mt-2 w-1 h-1 rounded-full bg-stone-400 shrink-0" />
+                  <span>{line}</span>
+                </li>
+              ))}
+            </ul>
+          );
+        }
+        return (
+          <p key={i} className="whitespace-pre-line">
+            {block}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
+function MetaRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline gap-2">
+      <dt className="text-stone-500 shrink-0">{label}</dt>
+      <dd className="text-stone-800 truncate">{value}</dd>
     </div>
   );
 }

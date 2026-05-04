@@ -9,7 +9,7 @@ import { ListingFilters } from '@/components/listings/ListingFilters';
 
 const MapView = dynamic(() => import('@/components/map/MapView').then(m => ({ default: m.MapView })), {
   ssr: false,
-  loading: () => <div className="w-full h-[calc(100vh-200px)] bg-gray-100 animate-pulse rounded-lg" />,
+  loading: () => <div className="w-full h-[calc(100vh-260px)] aurora-surface rounded-3xl animate-pulse" />,
 });
 
 function MapContent() {
@@ -22,7 +22,7 @@ function MapContent() {
   params.set('limit', '500');
   const queryString = params.toString();
 
-  const { data } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['map-listings', queryString],
     queryFn: () => fetch(`/api/listings?${queryString}`).then(r => r.json()),
   });
@@ -39,20 +39,29 @@ function MapContent() {
     router.push(`/map?${p.toString()}`);
   }
 
-  const handleBoundsChange = useCallback((bounds: { latMin: number; latMax: number; lngMin: number; lngMax: number }) => {
-    // Could update URL params here for deep-linking map viewport
+  const handleBoundsChange = useCallback((_bounds: { latMin: number; latMax: number; lngMin: number; lngMax: number }) => {
+    // future deep-linking
   }, []);
 
   const listings = (data?.data || []).filter((l: { latitude: number | null; longitude: number | null }) => l.latitude && l.longitude);
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="p-4 pb-0">
-        <h1 className="text-2xl font-bold text-gray-900 mb-3">Map View</h1>
-        <ListingFilters searchParams={searchParams} onUpdate={updateParams} />
-        <p className="text-sm text-gray-500 mb-3">{listings.length} properties with coordinates</p>
+    <div className="flex flex-col h-full px-6 md:px-10 py-8 max-w-[1500px] mx-auto w-full">
+      <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.3em] text-stone-500 font-medium">Geography</p>
+          <h1 className="font-serif text-4xl md:text-5xl font-light tracking-tight text-stone-900 mt-1.5">
+            Map <span className="italic">view</span>
+          </h1>
+          <p className="text-sm text-stone-500 mt-2">
+            {isLoading ? 'Loading…' : `${listings.length.toLocaleString()} properties with coordinates`}
+          </p>
+        </div>
       </div>
-      <div className="flex-1 px-4 pb-4">
+
+      <ListingFilters searchParams={searchParams} onUpdate={updateParams} />
+
+      <div className="flex-1 mt-1 rounded-3xl overflow-hidden aurora-surface">
         <MapView listings={listings} onBoundsChange={handleBoundsChange} />
       </div>
     </div>
@@ -61,7 +70,11 @@ function MapContent() {
 
 export default function MapPage() {
   return (
-    <Suspense fallback={<div className="p-6"><div className="animate-pulse h-96 bg-gray-200 rounded-lg" /></div>}>
+    <Suspense fallback={
+      <div className="px-6 md:px-10 py-8 max-w-[1500px] mx-auto">
+        <div className="animate-pulse h-96 rounded-3xl aurora-surface" />
+      </div>
+    }>
       <MapContent />
     </Suspense>
   );

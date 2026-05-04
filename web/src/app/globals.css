@@ -40,3 +40,19 @@ body {
   color: #111827;
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Tailwind v4 dropped the default cursor:pointer for buttons.
+   Restore it for every interactive element across the app. */
+button:not(:disabled),
+[role="button"]:not(:disabled),
+select:not(:disabled),
+summary,
+label[for] {
+  cursor: pointer;
+}
+
+button:disabled,
+[role="button"][aria-disabled="true"],
+select:disabled {
+  cursor: not-allowed;
+}

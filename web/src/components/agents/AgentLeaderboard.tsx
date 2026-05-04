@@ -42,12 +42,19 @@ interface ApiResponse {
 }
 
 const SORT_OPTIONS = [
-  { value: 'listings_desc', label: 'Most Listings' },
-  { value: 'listings_asc', label: 'Fewest Listings' },
-  { value: 'value_desc', label: 'Highest Value' },
-  { value: 'avg_price_desc', label: 'Highest Avg Price' },
-  { value: 'name_asc', label: 'Name A-Z' },
+  { value: 'listings_desc', label: 'Most listings' },
+  { value: 'listings_asc', label: 'Fewest listings' },
+  { value: 'value_desc', label: 'Highest portfolio value' },
+  { value: 'avg_price_desc', label: 'Highest avg price' },
+  { value: 'name_asc', label: 'Name A–Z' },
 ];
+
+function compactPrice(p: number | null | undefined): string {
+  if (p == null) return '—';
+  if (p >= 1_000_000) return `$${(p / 1_000_000).toFixed(2)}M`;
+  if (p >= 1_000) return `$${(p / 1_000).toFixed(0)}K`;
+  return `$${Math.round(p)}`;
+}
 
 export function AgentLeaderboard() {
   const [view, setView] = useState<'agencies' | 'agents'>('agencies');
@@ -88,41 +95,78 @@ export function AgentLeaderboard() {
 
   return (
     <div>
-      {/* Stats Row */}
+      {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard label="Agencies / Sellers" value={stats?.totalSellers ?? '—'} />
-        <StatCard label="Individual Agents" value={stats?.totalIndividualAgents ?? '—'} />
-        <StatCard label="Total Portfolio Value" value={stats ? formatPrice(stats.totalPortfolioValue) : '—'} />
-        <StatCard label="Avg Listings/Seller" value={stats?.avgListingsPerSeller ?? '—'} />
+        <StatCard label="Agencies / sellers" value={stats ? stats.totalSellers.toLocaleString() : '—'} />
+        <StatCard label="Individual agents" value={stats ? stats.totalIndividualAgents.toLocaleString() : '—'} />
+        <StatCard label="Total portfolio value" value={stats ? compactPrice(stats.totalPortfolioValue) : '—'} />
+        <StatCard label="Avg listings / seller" value={stats ? String(stats.avgListingsPerSeller) : '—'} />
       </div>
 
-      {/* View Tabs + Filters */}
-      <div className="flex flex-wrap items-center gap-3 mb-4">
-        <div className="flex bg-gray-100 rounded-lg p-0.5">
+      {/* Top performers — only on first page, no search/filter */}
+      {!isLoading && rows.length > 0 && page === 1 && !debouncedSearch && view === 'agencies' && (
+        <div className="mb-6">
+          <h2 className="font-serif text-xl text-stone-900 mb-3">
+            <span className="aurora-rule">Top performers</span>
+          </h2>
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+            {(rows as AgencyRow[]).slice(0, 5).map((agent, i) => (
+              <Link
+                key={agent.name}
+                href={`/agents/${encodeURIComponent(agent.name)}`}
+                className="group relative rounded-2xl aurora-surface p-4 overflow-hidden hover:-translate-y-0.5 hover:shadow-lg transition-all"
+              >
+                <div
+                  className="absolute -top-10 -right-10 w-24 h-24 rounded-full opacity-50 blur-2xl group-hover:opacity-80 transition-opacity"
+                  style={{ background: i === 0 ? '#c8dcc7' : i === 1 ? '#ebe4cd' : i === 2 ? '#cfd8e3' : '#e7e5e4' }}
+                />
+                <div className="relative">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="font-serif text-stone-900 text-2xl">
+                      {i === 0 ? '①' : i === 1 ? '②' : i === 2 ? '③' : `#${i + 1}`}
+                    </span>
+                  </div>
+                  <p className="font-serif text-base text-stone-900 truncate">{agent.name}</p>
+                  <p className="text-xs text-stone-500 truncate mt-0.5">{agent.primaryLocation || 'Various areas'}</p>
+                  <div className="mt-3 flex items-baseline gap-3 text-stone-700">
+                    <span className="font-serif text-xl tabular-nums">{agent.listingCount}</span>
+                    <span className="text-[10px] uppercase tracking-wider text-stone-500">listings</span>
+                  </div>
+                  <p className="text-xs text-stone-500 mt-0.5 tabular-nums">{compactPrice(agent.portfolioValue)} portfolio</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Filters */}
+      <div className="aurora-surface rounded-2xl p-4 mb-4 flex flex-wrap items-center gap-2.5">
+        <div className="flex bg-white/70 rounded-full p-0.5 border border-stone-200/60">
           <button
             onClick={() => { setView('agencies'); setPage(1); setSearch(''); setDebouncedSearch(''); setLocation(''); }}
-            className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-              view === 'agencies' ? 'bg-white text-gray-900 shadow-sm font-medium' : 'text-gray-500 hover:text-gray-700'
+            className={`px-3.5 py-1.5 text-sm rounded-full transition-colors ${
+              view === 'agencies' ? 'bg-stone-900 text-white' : 'text-stone-600 hover:text-stone-900'
             }`}
           >
             Agencies
           </button>
           <button
             onClick={() => { setView('agents'); setPage(1); setSearch(''); setDebouncedSearch(''); setLocation(''); }}
-            className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-              view === 'agents' ? 'bg-white text-gray-900 shadow-sm font-medium' : 'text-gray-500 hover:text-gray-700'
+            className={`px-3.5 py-1.5 text-sm rounded-full transition-colors ${
+              view === 'agents' ? 'bg-stone-900 text-white' : 'text-stone-600 hover:text-stone-900'
             }`}
           >
-            Individual Agents
+            Individual agents
           </button>
         </div>
 
         <input
           type="text"
-          placeholder={view === 'agencies' ? 'Search agencies...' : 'Search agents...'}
+          placeholder={view === 'agencies' ? 'Search agencies…' : 'Search agents…'}
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="px-3 py-2 border rounded-md text-sm w-64 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="aurora-input flex-1 min-w-[200px]"
         />
 
         <LocationCombobox
@@ -134,7 +178,7 @@ export function AgentLeaderboard() {
         <select
           value={sort}
           onChange={e => { setSort(e.target.value); setPage(1); }}
-          className="px-3 py-2 border rounded-md text-sm bg-white ml-auto"
+          className="aurora-input"
         >
           {SORT_OPTIONS.map(opt => (
             <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -143,7 +187,7 @@ export function AgentLeaderboard() {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-lg border overflow-hidden">
+      <div className="rounded-2xl aurora-surface overflow-hidden">
         <div className="overflow-x-auto">
           {view === 'agencies' ? (
             <AgenciesTable rows={rows as AgencyRow[]} isLoading={isLoading} />
@@ -155,59 +199,26 @@ export function AgentLeaderboard() {
 
       {/* Pagination */}
       {pagination && pagination.totalPages > 1 && (
-        <div className="flex justify-center items-center gap-2 mt-4">
+        <div className="flex justify-center items-center gap-3 mt-6">
           <button
             onClick={() => setPage(p => Math.max(1, p - 1))}
             disabled={page <= 1}
-            className="px-3 py-1.5 text-sm bg-white border rounded disabled:opacity-50 hover:bg-gray-50"
+            className="aurora-pill aurora-pill-ghost disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            Previous
+            ← Previous
           </button>
-          <span className="text-sm text-gray-600">
-            Page {pagination.page} of {pagination.totalPages}
-          </span>
+          <div className="aurora-surface px-4 py-2 rounded-full text-sm text-stone-700">
+            <span className="font-serif text-stone-900">{pagination.page}</span>
+            <span className="text-stone-400 mx-2">/</span>
+            <span className="text-stone-500">{pagination.totalPages}</span>
+          </div>
           <button
             onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))}
             disabled={page >= pagination.totalPages}
-            className="px-3 py-1.5 text-sm bg-white border rounded disabled:opacity-50 hover:bg-gray-50"
+            className="aurora-pill aurora-pill-ghost disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            Next
+            Next →
           </button>
-        </div>
-      )}
-
-      {/* Top 5 Performers */}
-      {!isLoading && rows.length > 0 && page === 1 && !debouncedSearch && view === 'agencies' && (
-        <div className="mt-8">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Top Performers</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-            {(rows as AgencyRow[]).slice(0, 5).map((agent, i) => (
-              <Link
-                key={agent.name}
-                href={`/agents/${encodeURIComponent(agent.name)}`}
-                className={`block p-4 rounded-lg border-2 transition-shadow hover:shadow-md ${
-                  i === 0 ? 'border-yellow-400 bg-yellow-50' :
-                  i === 1 ? 'border-gray-300 bg-gray-50' :
-                  i === 2 ? 'border-amber-600 bg-amber-50' :
-                  'border-gray-200 bg-white'
-                }`}
-              >
-                <div className="flex items-center gap-2 mb-2">
-                  <span className={`text-lg font-bold ${
-                    i === 0 ? 'text-yellow-600' : i === 1 ? 'text-gray-500' : i === 2 ? 'text-amber-700' : 'text-gray-400'
-                  }`}>
-                    #{i + 1}
-                  </span>
-                  <span className="font-semibold text-sm text-gray-900 truncate">{agent.name}</span>
-                </div>
-                <div className="space-y-1 text-xs text-gray-600">
-                  <p>{agent.listingCount} listings</p>
-                  <p>{formatPrice(agent.portfolioValue)}</p>
-                  <p className="truncate">{agent.primaryLocation || 'Various'}</p>
-                </div>
-              </Link>
-            ))}
-          </div>
         </div>
       )}
     </div>
@@ -218,55 +229,51 @@ function AgenciesTable({ rows, isLoading }: { rows: AgencyRow[]; isLoading: bool
   return (
     <table className="w-full text-sm">
       <thead>
-        <tr className="border-b bg-gray-50 text-left text-gray-500 text-xs uppercase">
+        <tr className="text-left text-[11px] uppercase tracking-wider text-stone-500 border-b border-stone-200/60">
           <th className="px-4 py-3 w-12">#</th>
-          <th className="px-4 py-3">Name</th>
-          <th className="px-4 py-3">Type</th>
-          <th className="px-4 py-3 text-right">Agents</th>
-          <th className="px-4 py-3 text-right">Listings</th>
-          <th className="px-4 py-3 text-right">Portfolio Value</th>
-          <th className="px-4 py-3 text-right">Avg Price</th>
-          <th className="px-4 py-3">Primary Area</th>
-          <th className="px-4 py-3 text-center">Verified</th>
-          <th className="px-4 py-3 text-center">WA</th>
+          <th className="px-4 py-3 font-medium">Name</th>
+          <th className="px-4 py-3 font-medium">Type</th>
+          <th className="px-4 py-3 text-right font-medium">Agents</th>
+          <th className="px-4 py-3 text-right font-medium">Listings</th>
+          <th className="px-4 py-3 text-right font-medium">Portfolio</th>
+          <th className="px-4 py-3 text-right font-medium">Avg price</th>
+          <th className="px-4 py-3 font-medium">Primary area</th>
+          <th className="px-4 py-3 text-center font-medium">✓</th>
+          <th className="px-4 py-3 text-center font-medium">WA</th>
         </tr>
       </thead>
       <tbody>
         {isLoading ? (
           Array.from({ length: 10 }).map((_, i) => (
-            <tr key={i} className="border-b">
-              <td colSpan={10} className="px-4 py-3"><div className="h-4 bg-gray-200 rounded animate-pulse" /></td>
+            <tr key={i} className="border-b border-stone-200/40">
+              <td colSpan={10} className="px-4 py-3"><div className="h-4 bg-stone-200/60 rounded animate-pulse" /></td>
             </tr>
           ))
         ) : rows.length === 0 ? (
-          <tr><td colSpan={10} className="px-4 py-8 text-center text-gray-500">No results found</td></tr>
+          <tr><td colSpan={10} className="px-4 py-12 text-center text-stone-500 italic">No results found</td></tr>
         ) : rows.map(row => (
-          <tr key={row.name} className="border-b hover:bg-gray-50 transition-colors">
-            <td className="px-4 py-3 text-gray-400 font-mono text-xs">{row.rank}</td>
+          <tr key={row.name} className="border-b border-stone-200/40 last:border-0 hover:bg-white/50 transition-colors">
+            <td className="px-4 py-3 text-stone-400 tabular-nums">{row.rank}</td>
             <td className="px-4 py-3">
-              <Link href={`/agents/${encodeURIComponent(row.name)}`} className="font-medium text-blue-600 hover:underline">
+              <Link href={`/agents/${encodeURIComponent(row.name)}`} className="font-medium text-stone-900 underline-offset-4 hover:underline">
                 {row.name}
               </Link>
             </td>
             <td className="px-4 py-3">
-              {row.type && (
-                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                  row.type === 'agent' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'
-                }`}>{row.type}</span>
-              )}
+              {row.type && <span className="aurora-chip capitalize">{row.type}</span>}
             </td>
-            <td className="px-4 py-3 text-right text-gray-600">{row.agentCount || '—'}</td>
-            <td className="px-4 py-3 text-right font-medium">
+            <td className="px-4 py-3 text-right text-stone-600 tabular-nums">{row.agentCount || '—'}</td>
+            <td className="px-4 py-3 text-right font-medium text-stone-900 tabular-nums">
               {row.listingCount}
               {row.totalListingCount > row.listingCount && (
-                <span className="text-xs text-gray-400 ml-1">/ {row.totalListingCount}</span>
+                <span className="text-xs text-stone-400 ml-1">/ {row.totalListingCount}</span>
               )}
             </td>
-            <td className="px-4 py-3 text-right">{formatPrice(row.portfolioValue)}</td>
-            <td className="px-4 py-3 text-right">{formatPrice(row.avgPrice)}</td>
-            <td className="px-4 py-3 text-gray-600 text-xs truncate max-w-[180px]">{row.primaryLocation || '—'}</td>
-            <td className="px-4 py-3 text-center">{row.verified && <span className="text-green-600">&#10003;</span>}</td>
-            <td className="px-4 py-3 text-center">{row.whatsapp && <span className="text-green-600">&#10003;</span>}</td>
+            <td className="px-4 py-3 text-right tabular-nums text-stone-700">{compactPrice(row.portfolioValue)}</td>
+            <td className="px-4 py-3 text-right tabular-nums text-stone-700">{compactPrice(row.avgPrice)}</td>
+            <td className="px-4 py-3 text-stone-600 text-xs truncate max-w-[180px]">{row.primaryLocation || '—'}</td>
+            <td className="px-4 py-3 text-center">{row.verified && <span className="text-emerald-600">✓</span>}</td>
+            <td className="px-4 py-3 text-center">{row.whatsapp && <span className="text-emerald-600">✓</span>}</td>
           </tr>
         ))}
       </tbody>
@@ -278,36 +285,36 @@ function AgentsTable({ rows, isLoading }: { rows: AgentRow[]; isLoading: boolean
   return (
     <table className="w-full text-sm">
       <thead>
-        <tr className="border-b bg-gray-50 text-left text-gray-500 text-xs uppercase">
+        <tr className="text-left text-[11px] uppercase tracking-wider text-stone-500 border-b border-stone-200/60">
           <th className="px-4 py-3 w-12">#</th>
-          <th className="px-4 py-3">Agent Name</th>
-          <th className="px-4 py-3">Agency</th>
-          <th className="px-4 py-3 text-right">Listings</th>
-          <th className="px-4 py-3 text-right">Portfolio Value</th>
-          <th className="px-4 py-3 text-right">Avg Price</th>
+          <th className="px-4 py-3 font-medium">Agent name</th>
+          <th className="px-4 py-3 font-medium">Agency</th>
+          <th className="px-4 py-3 text-right font-medium">Listings</th>
+          <th className="px-4 py-3 text-right font-medium">Portfolio</th>
+          <th className="px-4 py-3 text-right font-medium">Avg price</th>
         </tr>
       </thead>
       <tbody>
         {isLoading ? (
           Array.from({ length: 10 }).map((_, i) => (
-            <tr key={i} className="border-b">
-              <td colSpan={6} className="px-4 py-3"><div className="h-4 bg-gray-200 rounded animate-pulse" /></td>
+            <tr key={i} className="border-b border-stone-200/40">
+              <td colSpan={6} className="px-4 py-3"><div className="h-4 bg-stone-200/60 rounded animate-pulse" /></td>
             </tr>
           ))
         ) : rows.length === 0 ? (
-          <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">No results found</td></tr>
+          <tr><td colSpan={6} className="px-4 py-12 text-center text-stone-500 italic">No results found</td></tr>
         ) : rows.map(row => (
-          <tr key={`${row.name}-${row.agency}`} className="border-b hover:bg-gray-50 transition-colors">
-            <td className="px-4 py-3 text-gray-400 font-mono text-xs">{row.rank}</td>
-            <td className="px-4 py-3 font-medium text-gray-900">{row.name}</td>
+          <tr key={`${row.name}-${row.agency}`} className="border-b border-stone-200/40 last:border-0 hover:bg-white/50 transition-colors">
+            <td className="px-4 py-3 text-stone-400 tabular-nums">{row.rank}</td>
+            <td className="px-4 py-3 font-medium text-stone-900">{row.name}</td>
             <td className="px-4 py-3">
-              <Link href={`/agents/${encodeURIComponent(row.agency)}`} className="text-blue-600 hover:underline text-sm">
+              <Link href={`/agents/${encodeURIComponent(row.agency)}`} className="text-stone-700 underline-offset-4 hover:underline text-sm">
                 {row.agency}
               </Link>
             </td>
-            <td className="px-4 py-3 text-right font-medium">{row.listingCount}</td>
-            <td className="px-4 py-3 text-right">{formatPrice(row.portfolioValue)}</td>
-            <td className="px-4 py-3 text-right">{formatPrice(row.avgPrice)}</td>
+            <td className="px-4 py-3 text-right font-medium text-stone-900 tabular-nums">{row.listingCount}</td>
+            <td className="px-4 py-3 text-right tabular-nums text-stone-700">{compactPrice(row.portfolioValue)}</td>
+            <td className="px-4 py-3 text-right tabular-nums text-stone-700">{compactPrice(row.avgPrice)}</td>
           </tr>
         ))}
       </tbody>
@@ -315,11 +322,11 @@ function AgentsTable({ rows, isLoading }: { rows: AgentRow[]; isLoading: boolean
   );
 }
 
-function StatCard({ label, value }: { label: string; value: string | number }) {
+function StatCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-white rounded-lg border p-4">
-      <p className="text-xs text-gray-500 uppercase tracking-wide">{label}</p>
-      <p className="text-2xl font-bold text-gray-900 mt-1">{value}</p>
+    <div className="aurora-surface rounded-2xl p-5">
+      <p className="text-[10px] uppercase tracking-[0.2em] text-stone-500 font-medium">{label}</p>
+      <p className="font-serif text-3xl font-light text-stone-900 mt-2 tabular-nums">{value}</p>
     </div>
   );
 }
@@ -354,54 +361,56 @@ function LocationCombobox({
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
-  const displayValue = value || 'All Areas';
-
   return (
     <div ref={containerRef} className="relative">
       <button
         type="button"
         onClick={() => { setOpen(!open); setQuery(''); setTimeout(() => inputRef.current?.focus(), 0); }}
-        className="flex items-center gap-1.5 px-3 py-2 border rounded-md text-sm bg-white hover:bg-gray-50 min-w-[180px]"
+        className="aurora-input flex items-center gap-1.5 min-w-[180px]"
       >
-        <span className="truncate flex-1 text-left">{displayValue}</span>
-        <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        <span className={`truncate flex-1 text-left ${value ? 'text-stone-900' : 'text-stone-500'}`}>
+          {value || 'All areas'}
+        </span>
+        <svg className="w-3.5 h-3.5 text-stone-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
         </svg>
       </button>
 
       {open && (
-        <div className="absolute z-20 mt-1 w-72 bg-white border rounded-lg shadow-lg">
-          <div className="p-2 border-b">
+        <div className="absolute z-20 mt-1.5 w-72 rounded-2xl shadow-xl aurora-surface-strong overflow-hidden">
+          <div className="p-2 border-b border-stone-200/60">
             <input
               ref={inputRef}
               type="text"
-              placeholder="Type to filter..."
+              placeholder="Type to filter…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="w-full px-2.5 py-1.5 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="aurora-input w-full text-sm"
             />
           </div>
           <div className="max-h-60 overflow-y-auto">
             <button
               onClick={() => { onChange(''); setOpen(false); setQuery(''); }}
-              className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${!value ? 'bg-blue-50 text-blue-700 font-medium' : ''}`}
+              className={`w-full text-left px-3 py-2 text-sm transition-colors hover:bg-emerald-50/70 ${
+                !value ? 'bg-emerald-50 text-emerald-800 font-medium' : 'text-stone-700'
+              }`}
             >
-              All Areas
+              All areas
             </button>
             {filtered.map((loc) => (
               <button
                 key={loc.value}
                 onClick={() => { onChange(loc.value); setOpen(false); setQuery(''); }}
-                className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex justify-between ${
-                  value === loc.value ? 'bg-blue-50 text-blue-700 font-medium' : ''
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-emerald-50/70 flex justify-between transition-colors ${
+                  value === loc.value ? 'bg-emerald-50 text-emerald-800 font-medium' : 'text-stone-700'
                 }`}
               >
                 <span className="truncate">{loc.value}</span>
-                <span className="text-gray-400 text-xs ml-2 flex-shrink-0">{loc.count}</span>
+                <span className="text-stone-400 text-xs ml-2 flex-shrink-0 tabular-nums">{loc.count}</span>
               </button>
             ))}
             {filtered.length === 0 && (
-              <div className="px-3 py-4 text-sm text-gray-400 text-center">No matching areas</div>
+              <div className="px-3 py-4 text-sm text-stone-400 text-center italic">No matching areas</div>
             )}
           </div>
         </div>

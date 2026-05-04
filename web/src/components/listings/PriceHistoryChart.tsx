@@ -29,21 +29,25 @@ export function PriceHistoryChart({ data, currentPrice }: PriceHistoryChartProps
   return (
     <div className="h-48">
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={chartData}>
-          <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+        <LineChart data={chartData} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
+          <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#78716c' }} axisLine={false} tickLine={false} />
           <YAxis
-            tick={{ fontSize: 11 }}
+            tick={{ fontSize: 11, fill: '#78716c' }}
             tickFormatter={v => `$${(v / 1000).toFixed(0)}k`}
+            axisLine={false}
+            tickLine={false}
           />
           <Tooltip
+            contentStyle={{ background: 'rgba(255,255,255,0.97)', border: '1px solid #e7e5e4', borderRadius: 12, fontSize: 12 }}
             formatter={(value) => [formatPrice(value as number), 'Price']}
           />
           <Line
             type="monotone"
             dataKey="price"
-            stroke="#3b82f6"
-            strokeWidth={2}
-            dot={{ r: 4 }}
+            stroke="#4a6b4a"
+            strokeWidth={2.5}
+            dot={{ r: 4, fill: '#4a6b4a', strokeWidth: 0 }}
+            activeDot={{ r: 6, fill: '#1a1a1a', strokeWidth: 0 }}
           />
         </LineChart>
       </ResponsiveContainer>
