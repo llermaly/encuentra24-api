@@ -63,20 +63,25 @@ export function ListingFilters({ searchParams, onUpdate }: ListingFiltersProps) 
   );
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4 mb-4">
-      <div className="flex flex-wrap gap-3 items-end">
-        <div className="flex-1 min-w-[200px] flex gap-1">
-          <input
-            type="text"
-            placeholder="Search by title, description..."
-            value={q}
-            onChange={e => setQ(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') submitSearch(); }}
-            className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+    <div className="aurora-surface rounded-2xl p-4 mb-4">
+      <div className="flex flex-wrap gap-2.5 items-end">
+        <div className="flex-1 min-w-[220px] flex gap-1.5">
+          <div className="relative flex-1">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5-5m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input
+              type="text"
+              placeholder="Search by title or description…"
+              value={q}
+              onChange={e => setQ(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') submitSearch(); }}
+              className="aurora-input w-full pl-9"
+            />
+          </div>
           <button
             onClick={submitSearch}
-            className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+            className="aurora-pill aurora-pill-primary"
           >
             Search
           </button>
@@ -101,14 +106,17 @@ export function ListingFilters({ searchParams, onUpdate }: ListingFiltersProps) 
         />
         <button
           onClick={() => setExpanded(!expanded)}
-          className="px-3 py-1.5 text-sm text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
+          className="aurora-pill aurora-pill-ghost"
         >
-          {expanded ? 'Less Filters' : 'More Filters'}
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 5h18M6 12h12M10 19h4" />
+          </svg>
+          {expanded ? 'Less filters' : 'More filters'}
         </button>
       </div>
 
       {expanded && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3 pt-3 border-t border-gray-200">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 pt-4 border-t border-stone-200/60">
           <RangeFilter
             label="Price"
             minValue={searchParams.get('priceMin') || ''}
@@ -137,11 +145,11 @@ export function ListingFilters({ searchParams, onUpdate }: ListingFiltersProps) 
             min="0"
           />
           <div>
-            <label className="block text-xs text-gray-500 mb-1">City</label>
+            <label className="block text-[11px] uppercase tracking-wider text-stone-500 mb-1.5 font-medium">City</label>
             <select
               value={searchParams.get('city') || ''}
               onChange={e => onUpdate({ city: e.target.value || undefined })}
-              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded bg-white text-gray-900"
+              className="aurora-input w-full"
             >
               <option value="">All Cities</option>
               {cityOptions.map(opt => (
@@ -157,11 +165,11 @@ export function ListingFilters({ searchParams, onUpdate }: ListingFiltersProps) 
             onMaxChange={v => onUpdate({ landAreaMax: v || undefined })}
           />
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Status</label>
+            <label className="block text-[11px] uppercase tracking-wider text-stone-500 mb-1.5 font-medium">Status</label>
             <select
               value={searchParams.get('status') || 'active'}
               onChange={e => onUpdate({ status: e.target.value === 'active' ? undefined : e.target.value })}
-              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded bg-white text-gray-900"
+              className="aurora-input w-full"
             >
               <option value="active">Active only</option>
               <option value="removed">Removed only</option>
@@ -228,46 +236,46 @@ const SearchableSelect = memo(function SearchableSelect({
     <div ref={ref} className="relative">
       <button
         onClick={() => { setOpen(!open); setSearch(''); }}
-        className="px-3 py-1.5 text-sm border border-gray-300 rounded bg-white text-gray-900 min-w-[160px] text-left flex items-center justify-between gap-2 hover:bg-gray-50"
+        className="aurora-input min-w-[170px] text-left flex items-center justify-between gap-2 hover:bg-white/85"
       >
-        <span className={value ? 'text-gray-900' : 'text-gray-500'}>
+        <span className={value ? 'text-stone-900' : 'text-stone-500'}>
           {value || placeholder}
         </span>
         {value ? (
           <span
             onClick={e => { e.stopPropagation(); onChange(''); setOpen(false); }}
-            className="text-gray-400 hover:text-gray-600"
+            className="text-stone-400 hover:text-stone-700 text-base leading-none"
           >
             &times;
           </span>
         ) : (
-          <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-3 h-3 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
         )}
       </button>
       {open && (
-        <div className="absolute z-[1000] mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-hidden">
-          <div className="p-2 border-b border-gray-100">
+        <div className="absolute z-[1000] mt-1.5 w-64 rounded-2xl shadow-xl max-h-64 overflow-hidden aurora-surface-strong">
+          <div className="p-2 border-b border-stone-200/60">
             <input
               type="text"
-              placeholder="Type to filter..."
+              placeholder="Type to filter…"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="w-full px-2 py-1 text-sm border border-gray-300 rounded text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="aurora-input w-full text-sm"
               autoFocus
             />
           </div>
           <div className="overflow-y-auto max-h-48">
             {filtered.length === 0 ? (
-              <p className="px-3 py-2 text-sm text-gray-500">No matches</p>
+              <p className="px-3 py-2 text-sm text-stone-500">No matches</p>
             ) : (
               filtered.slice(0, 50).map(opt => (
                 <button
                   key={opt.value}
                   onClick={() => { onChange(opt.value); setOpen(false); }}
-                  className={`w-full text-left px-3 py-1.5 text-sm hover:bg-blue-50 ${
-                    opt.value === value ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'
+                  className={`w-full text-left px-3 py-1.5 text-sm transition-colors hover:bg-emerald-50/70 ${
+                    opt.value === value ? 'bg-emerald-50 text-emerald-800 font-medium' : 'text-stone-700'
                   }`}
                 >
                   {opt.label}
@@ -297,7 +305,7 @@ function SelectFilter({
       <select
         value={value}
         onChange={e => onChange(e.target.value)}
-        className="px-3 py-1.5 text-sm border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="aurora-input min-w-[140px]"
       >
         <option value="">All {label}</option>
         {options.map(opt => (
@@ -341,21 +349,21 @@ function RangeFilter({
 
   return (
     <div>
-      <label className="block text-xs text-gray-500 mb-1">{label}</label>
+      <label className="block text-[11px] uppercase tracking-wider text-stone-500 mb-1.5 font-medium">{label}</label>
       <div className="flex gap-1">
         <input
           type="number"
           placeholder="Min"
           value={localMin}
           onChange={e => setLocalMin(e.target.value)}
-          className="w-1/2 px-2 py-1.5 text-sm border border-gray-300 rounded text-gray-900 placeholder:text-gray-400"
+          className="aurora-input w-1/2 placeholder:text-stone-400"
         />
         <input
           type="number"
           placeholder="Max"
           value={localMax}
           onChange={e => setLocalMax(e.target.value)}
-          className="w-1/2 px-2 py-1.5 text-sm border border-gray-300 rounded text-gray-900 placeholder:text-gray-400"
+          className="aurora-input w-1/2 placeholder:text-stone-400"
         />
       </div>
     </div>
@@ -385,12 +393,12 @@ function DebouncedNumberInput({
 
   return (
     <div>
-      <label className="block text-xs text-gray-500 mb-1">{label}</label>
+      <label className="block text-[11px] uppercase tracking-wider text-stone-500 mb-1.5 font-medium">{label}</label>
       <input
         type="number"
         value={local}
         onChange={e => setLocal(e.target.value)}
-        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded text-gray-900"
+        className="aurora-input w-full"
         min={min}
       />
     </div>

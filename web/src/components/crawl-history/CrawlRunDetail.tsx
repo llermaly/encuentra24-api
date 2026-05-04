@@ -184,22 +184,22 @@ export function CrawlRunDetail({ runId }: { runId: number }) {
   if (isLoading) {
     return (
       <div className="space-y-4">
-        <div className="animate-pulse bg-gray-200 rounded-lg h-16" />
+        <div className="animate-pulse aurora-surface h-16" />
         <div className="grid grid-cols-4 gap-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="animate-pulse bg-gray-200 rounded-lg h-24" />
+            <div key={i} className="animate-pulse aurora-surface h-24" />
           ))}
         </div>
-        <div className="animate-pulse bg-gray-200 rounded-lg h-96" />
+        <div className="animate-pulse aurora-surface h-96" />
       </div>
     );
   }
 
   if (error || !data) {
     return (
-      <div className="text-center py-12 text-gray-500">
+      <div className="text-center py-12 text-stone-500 italic">
         <p>Failed to load crawl run data.</p>
-        <Link href="/crawl-history" className="text-blue-600 hover:underline mt-2 inline-block">Back to history</Link>
+        <Link href="/crawl-history" className="text-stone-900 underline-offset-4 hover:underline mt-2 inline-block">Back to history</Link>
       </div>
     );
   }
@@ -207,10 +207,10 @@ export function CrawlRunDetail({ runId }: { runId: number }) {
   const { crawlRun, stats, price, breakdowns, newListings, updatedListings, removedListings, errors: crawlErrors } = data;
   const isRunning = crawlRun.isRunning;
 
-  const tabs: { key: Tab; label: string; count: number; color?: string }[] = [
-    { key: 'new', label: 'New Listings', count: stats.newListings },
+  const tabs: { key: Tab; label: string; count: number }[] = [
+    { key: 'new', label: 'New listings', count: stats.newListings },
     { key: 'updated', label: 'Updated', count: stats.updatedListings },
-    { key: 'removed', label: 'Removed', count: stats.removed, color: 'text-red-600' },
+    { key: 'removed', label: 'Removed', count: stats.removed },
     { key: 'sellers', label: 'Sellers', count: breakdowns.sellers.length },
     { key: 'errors', label: 'Errors', count: stats.errors },
   ];
@@ -218,84 +218,88 @@ export function CrawlRunDetail({ runId }: { runId: number }) {
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <Link href="/crawl-history" className="text-gray-400 hover:text-gray-600">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-          </Link>
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-gray-900">Crawl #{crawlRun.id}</h1>
-              <span className={`inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium ${
-                isRunning ? 'bg-yellow-100 text-yellow-800 animate-pulse' :
-                crawlRun.status === 'completed' ? 'bg-green-100 text-green-800' :
-                crawlRun.status === 'cancelled' ? 'bg-orange-100 text-orange-800' :
-                'bg-red-100 text-red-800'
-              }`}>
-                {isRunning && (
-                  <span className="relative flex h-2 w-2 mr-1.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-500 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-yellow-500" />
-                  </span>
-                )}
-                {crawlRun.status}
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
+        <Link href="/crawl-history" className="aurora-pill aurora-pill-ghost">
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
+          Back to history
+        </Link>
+        {isRunning && (
+          <button
+            onClick={handleCancel}
+            disabled={cancelling}
+            className="aurora-pill aurora-pill-ghost text-rose-700 hover:text-rose-900"
+          >
+            {cancelling ? 'Cancelling…' : 'Cancel run'}
+          </button>
+        )}
+      </div>
+
+      <div className="mb-6">
+        <p className="text-[11px] uppercase tracking-[0.3em] text-stone-500 font-medium">Run detail</p>
+        <h1 className="font-serif text-4xl md:text-5xl font-light tracking-tight text-stone-900 mt-1.5">
+          Crawl <span className="italic">#{crawlRun.id}</span>
+        </h1>
+        <div className="flex flex-wrap items-center gap-1.5 mt-3">
+          <span className={
+            isRunning ? 'aurora-chip aurora-chip-sand' :
+            crawlRun.status === 'completed' ? 'aurora-chip aurora-chip-mint' :
+            'aurora-chip aurora-chip-warn'
+          }>
+            {isRunning && (
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-70" />
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-600" />
               </span>
-              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium capitalize ${
-                crawlRun.type === 'full' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
-              }`}>
-                {crawlRun.type}
-              </span>
-            </div>
-            <p className="text-sm text-gray-500 mt-0.5">
-              Started {new Date(crawlRun.startedAt).toLocaleString()}
-              {crawlRun.category && <> &middot; {crawlRun.category}{crawlRun.subcategory ? ` / ${crawlRun.subcategory}` : ''}</>}
-              {' '}&middot;{' '}
-              <ElapsedTimer startedAt={crawlRun.startedAt} isRunning={isRunning} />
-              {isRunning && <span className="text-yellow-600 ml-1">(polling every 5s)</span>}
-            </p>
-          </div>
-          {isRunning && (
-            <button
-              onClick={handleCancel}
-              disabled={cancelling}
-              className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 flex-shrink-0"
-            >
-              {cancelling ? 'Cancelling...' : 'Cancel Run'}
-            </button>
+            )}
+            {crawlRun.status}
+          </span>
+          <span className={crawlRun.type === 'full' ? 'aurora-chip aurora-chip-slate capitalize' : 'aurora-chip capitalize'}>
+            {crawlRun.type}
+          </span>
+          {crawlRun.category && (
+            <span className="aurora-chip">{crawlRun.category}{crawlRun.subcategory ? ` / ${crawlRun.subcategory}` : ''}</span>
           )}
         </div>
+        <p className="text-sm text-stone-500 mt-3">
+          Started {new Date(crawlRun.startedAt).toLocaleString()}
+          {' · '}
+          <ElapsedTimer startedAt={crawlRun.startedAt} isRunning={isRunning} />
+          {isRunning && <span className="text-amber-700 ml-1">(polling every 5s)</span>}
+        </p>
       </div>
 
       {/* Stats cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <StatCard label="New Listings" value={stats.newListings} color="text-green-600" />
-        <StatCard label="Details Crawled" value={stats.detailsCrawled} color="text-blue-600" />
-        <StatCard label="Updated" value={stats.updatedListings} color="text-indigo-600" />
-        <StatCard label="Errors" value={stats.errors} color={stats.errors > 0 ? 'text-red-600' : 'text-gray-400'} />
+        <StatCard label="New listings" value={stats.newListings} accent="#4a6b4a" />
+        <StatCard label="Details crawled" value={stats.detailsCrawled} accent="#475569" />
+        <StatCard label="Updated" value={stats.updatedListings} accent="#8b7949" />
+        <StatCard label="Errors" value={stats.errors} accent={stats.errors > 0 ? '#9a3412' : '#94a3b8'} />
       </div>
 
       {/* Price + Breakdowns row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         {price.total > 0 && (
-          <div className="bg-white rounded-lg shadow p-4">
-            <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Price Summary</h3>
+          <div className="aurora-surface rounded-2xl p-4">
+            <h3 className="text-[11px] uppercase tracking-wider text-stone-500 font-medium mb-3">Price Summary</h3>
             <div className="space-y-2 text-sm">
-              <div className="flex justify-between"><span className="text-gray-500">Avg Price</span><span className="font-medium">{formatPrice(price.avg)}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">Min</span><span className="font-medium">{formatPrice(price.min)}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">Max</span><span className="font-medium">{formatPrice(price.max)}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">With Price</span><span className="font-medium">{price.total}</span></div>
+              <div className="flex justify-between"><span className="text-stone-500">Avg price</span><span className="font-medium tabular-nums">{formatPrice(price.avg)}</span></div>
+              <div className="flex justify-between"><span className="text-stone-500">Min</span><span className="font-medium tabular-nums">{formatPrice(price.min)}</span></div>
+              <div className="flex justify-between"><span className="text-stone-500">Max</span><span className="font-medium tabular-nums">{formatPrice(price.max)}</span></div>
+              <div className="flex justify-between"><span className="text-stone-500">With price</span><span className="font-medium tabular-nums">{price.total}</span></div>
             </div>
           </div>
         )}
 
         {breakdowns.categories.length > 0 && (
-          <div className="bg-white rounded-lg shadow p-4">
-            <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Categories</h3>
+          <div className="aurora-surface rounded-2xl p-4">
+            <h3 className="text-[11px] uppercase tracking-wider text-stone-500 font-medium mb-3">Categories</h3>
             <div className="space-y-1.5 max-h-40 overflow-y-auto">
               {breakdowns.categories.map((c) => (
                 <div key={`${c.category}-${c.subcategory}`} className="flex justify-between text-sm">
-                  <span className="text-gray-700 truncate">{c.category} / {c.subcategory}</span>
-                  <span className="font-medium text-gray-900 ml-2">{c.count}</span>
+                  <span className="text-stone-700 truncate">{c.category} / {c.subcategory}</span>
+                  <span className="font-medium text-stone-900 ml-2 tabular-nums">{c.count}</span>
                 </div>
               ))}
             </div>
@@ -303,13 +307,13 @@ export function CrawlRunDetail({ runId }: { runId: number }) {
         )}
 
         {breakdowns.locations.length > 0 && (
-          <div className="bg-white rounded-lg shadow p-4">
-            <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Top Locations</h3>
+          <div className="aurora-surface rounded-2xl p-4">
+            <h3 className="text-[11px] uppercase tracking-wider text-stone-500 font-medium mb-3">Top Locations</h3>
             <div className="space-y-1.5 max-h-40 overflow-y-auto">
               {breakdowns.locations.map((l) => (
                 <div key={l.location} className="flex justify-between text-sm">
-                  <span className="text-gray-700 truncate">{l.location}</span>
-                  <span className="font-medium text-gray-900 ml-2">{l.count}</span>
+                  <span className="text-stone-700 truncate">{l.location}</span>
+                  <span className="font-medium text-stone-900 ml-2 tabular-nums">{l.count}</span>
                 </div>
               ))}
             </div>
@@ -318,8 +322,8 @@ export function CrawlRunDetail({ runId }: { runId: number }) {
       </div>
 
       {/* Tabs */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="border-b border-gray-200">
+      <div className="aurora-surface rounded-2xl">
+        <div className="border-b border-stone-200/60">
           <nav className="flex -mb-px">
             {tabs.map((t) => (
               <button
@@ -327,13 +331,13 @@ export function CrawlRunDetail({ runId }: { runId: number }) {
                 onClick={() => setTab(t.key)}
                 className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
                   tab === t.key
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-stone-900 text-stone-900'
+                    : 'border-transparent text-stone-500 hover:text-stone-900 hover:border-stone-300'
                 }`}
               >
                 {t.label}
-                <span className={`ml-1.5 px-1.5 py-0.5 rounded text-xs ${
-                  tab === t.key ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-500'
+                <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] tabular-nums ${
+                  tab === t.key ? 'bg-stone-900 text-white' : 'bg-stone-100 text-stone-500'
                 }`}>
                   {t.count}
                 </span>
@@ -354,11 +358,11 @@ export function CrawlRunDetail({ runId }: { runId: number }) {
   );
 }
 
-function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
+function StatCard({ label, value, accent }: { label: string; value: number; accent: string }) {
   return (
-    <div className="bg-white rounded-lg shadow p-4">
-      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">{label}</p>
-      <p className={`text-3xl font-bold mt-1 ${color}`}>{value.toLocaleString()}</p>
+    <div className="aurora-surface rounded-2xl p-5">
+      <p className="text-[10px] uppercase tracking-[0.2em] text-stone-500 font-medium">{label}</p>
+      <p className="font-serif text-3xl font-light mt-2 tabular-nums" style={{ color: accent }}>{value.toLocaleString()}</p>
     </div>
   );
 }
@@ -366,24 +370,24 @@ function StatCard({ label, value, color }: { label: string; value: number; color
 function PaginationControls({ pagination, onPageChange }: { pagination: Pagination; onPageChange: (p: number) => void }) {
   if (pagination.totalPages <= 1) return null;
   return (
-    <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100">
-      <span className="text-xs text-gray-500">
-        Page {pagination.page} of {pagination.totalPages} ({pagination.total} total)
+    <div className="flex items-center justify-between px-5 py-3 border-t border-stone-200/40">
+      <span className="text-xs text-stone-500">
+        Page <span className="font-serif text-stone-900 text-base">{pagination.page}</span> of {pagination.totalPages} <span className="text-stone-400">({pagination.total.toLocaleString()} total)</span>
       </span>
       <div className="flex gap-2">
         <button
           onClick={() => onPageChange(pagination.page - 1)}
           disabled={pagination.page <= 1}
-          className="px-2.5 py-1 text-xs bg-white border rounded disabled:opacity-50 hover:bg-gray-50"
+          className="aurora-pill aurora-pill-ghost text-xs disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          Prev
+          ← Prev
         </button>
         <button
           onClick={() => onPageChange(pagination.page + 1)}
           disabled={pagination.page >= pagination.totalPages}
-          className="px-2.5 py-1 text-xs bg-white border rounded disabled:opacity-50 hover:bg-gray-50"
+          className="aurora-pill aurora-pill-ghost text-xs disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          Next
+          Next →
         </button>
       </div>
     </div>
@@ -392,43 +396,44 @@ function PaginationControls({ pagination, onPageChange }: { pagination: Paginati
 
 function NewListingsTab({ data, onPageChange }: { data: CrawlLiveData['newListings']; onPageChange: (p: number) => void }) {
   if (data.data.length === 0) {
-    return <div className="p-8 text-center text-gray-500">No new listings yet</div>;
+    return <div className="p-8 text-center text-stone-500 italic">No new listings yet</div>;
   }
 
   return (
     <>
-      <div className="divide-y divide-gray-100">
+      <div className="divide-y divide-stone-200/40">
         {data.data.map((l) => (
           <Link
             key={l.adId}
             href={`/listings/${l.adId}`}
-            className="flex items-center gap-4 px-5 py-3 hover:bg-gray-50 transition-colors"
+            className="flex items-center gap-4 px-5 py-3 hover:bg-white/50 transition-colors"
           >
-            <div className="w-16 h-12 flex-shrink-0 rounded bg-gray-100 overflow-hidden">
+            <div className="w-16 h-12 flex-shrink-0 rounded-lg bg-stone-100 overflow-hidden">
               {l.thumbnail ? (
+                // eslint-disable-next-line @next/next/no-img-element
                 <img src={l.thumbnail} alt="" className="w-full h-full object-cover" />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-gray-300">
+                <div className="w-full h-full flex items-center justify-center text-stone-300">
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" /></svg>
                 </div>
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">{l.title || l.adId}</p>
-              <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
+              <p className="text-sm font-medium text-stone-900 truncate">{l.title || l.adId}</p>
+              <div className="flex items-center gap-2 text-xs text-stone-500 mt-0.5">
                 <span>{l.subcategory}</span>
                 {l.location && <><span>&middot;</span><span>{l.location}</span></>}
                 {l.sellerName && <><span>&middot;</span><span>{l.sellerName}</span></>}
               </div>
             </div>
-            <div className="hidden md:flex items-center gap-3 text-xs text-gray-500 flex-shrink-0">
+            <div className="hidden md:flex items-center gap-3 text-xs text-stone-500 flex-shrink-0">
               {l.bedrooms !== null && <span>{l.bedrooms}bd</span>}
               {l.bathrooms !== null && <span>{l.bathrooms}ba</span>}
               {l.area !== null && <span>{l.area}m²</span>}
             </div>
             <div className="text-right flex-shrink-0">
-              <p className="text-sm font-semibold text-gray-900">{formatPrice(l.price)}</p>
-              <p className="text-xs text-gray-400">{formatTimeShort(l.firstSeenAt)}</p>
+              <p className="text-sm font-semibold text-stone-900 tabular-nums">{formatPrice(l.price)}</p>
+              <p className="text-xs text-stone-400">{formatTimeShort(l.firstSeenAt)}</p>
             </div>
           </Link>
         ))}
@@ -440,21 +445,21 @@ function NewListingsTab({ data, onPageChange }: { data: CrawlLiveData['newListin
 
 function UpdatedListingsTab({ data, onPageChange }: { data: CrawlLiveData['updatedListings']; onPageChange: (p: number) => void }) {
   if (data.data.length === 0) {
-    return <div className="p-8 text-center text-gray-500">No updated listings yet</div>;
+    return <div className="p-8 text-center text-stone-500 italic">No updated listings yet</div>;
   }
 
   return (
     <>
-      <div className="divide-y divide-gray-100">
+      <div className="divide-y divide-stone-200/40">
         {data.data.map((l) => (
           <Link
             key={l.adId}
             href={`/listings/${l.adId}`}
-            className="flex items-center gap-4 px-5 py-3 hover:bg-gray-50 transition-colors"
+            className="flex items-center gap-4 px-5 py-3 hover:bg-white/50 transition-colors"
           >
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">{l.title || l.adId}</p>
-              <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
+              <p className="text-sm font-medium text-stone-900 truncate">{l.title || l.adId}</p>
+              <div className="flex items-center gap-2 text-xs text-stone-500 mt-0.5">
                 <span>{l.subcategory}</span>
                 {l.location && <><span>&middot;</span><span>{l.location}</span></>}
                 {l.sellerName && <><span>&middot;</span><span>{l.sellerName}</span></>}
@@ -462,10 +467,10 @@ function UpdatedListingsTab({ data, onPageChange }: { data: CrawlLiveData['updat
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
               {l.detailCrawled && (
-                <span className="px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-700">detail</span>
+                <span className="aurora-chip aurora-chip-slate">detail</span>
               )}
-              <span className="text-sm font-semibold text-gray-900">{formatPrice(l.price)}</span>
-              <span className="text-xs text-gray-400">{formatTimeShort(l.updatedAt)}</span>
+              <span className="text-sm font-semibold text-stone-900 tabular-nums">{formatPrice(l.price)}</span>
+              <span className="text-xs text-stone-400">{formatTimeShort(l.updatedAt)}</span>
             </div>
           </Link>
         ))}
@@ -477,29 +482,32 @@ function UpdatedListingsTab({ data, onPageChange }: { data: CrawlLiveData['updat
 
 function SellersTab({ sellers }: { sellers: CrawlLiveData['breakdowns']['sellers'] }) {
   if (sellers.length === 0) {
-    return <div className="p-8 text-center text-gray-500">No sellers found yet</div>;
+    return <div className="p-8 text-center text-stone-500 italic">No sellers found yet</div>;
   }
 
   const maxCount = Math.max(...sellers.map((s) => s.count), 1);
 
   return (
-    <div className="divide-y divide-gray-100">
+    <div className="divide-y divide-stone-200/40">
       {sellers.map((s) => (
         <Link
           key={s.name}
           href={`/agents/${encodeURIComponent(s.name)}`}
-          className="flex items-center gap-4 px-5 py-3 hover:bg-gray-50 transition-colors"
+          className="flex items-center gap-4 px-5 py-3 hover:bg-white/50 transition-colors"
         >
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900">{s.name}</p>
-            <div className="mt-1.5 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+            <p className="text-sm font-medium text-stone-900">{s.name}</p>
+            <div className="mt-1.5 h-1.5 bg-stone-100 rounded-full overflow-hidden">
               <div
-                className="h-full bg-blue-500 rounded-full"
-                style={{ width: `${(s.count / maxCount) * 100}%` }}
+                className="h-full rounded-full"
+                style={{
+                  width: `${(s.count / maxCount) * 100}%`,
+                  background: 'linear-gradient(to right, #4a6b4a, #6b8e6b)',
+                }}
               />
             </div>
           </div>
-          <span className="text-sm font-semibold text-gray-900 flex-shrink-0">{s.count} listings</span>
+          <span className="text-sm font-medium text-stone-900 tabular-nums flex-shrink-0">{s.count}</span>
         </Link>
       ))}
     </div>
@@ -508,20 +516,20 @@ function SellersTab({ sellers }: { sellers: CrawlLiveData['breakdowns']['sellers
 
 function RemovedListingsTab({ data, onPageChange }: { data: CrawlLiveData['removedListings']; onPageChange: (p: number) => void }) {
   if (data.data.length === 0) {
-    return <div className="p-8 text-center text-gray-500">No removed listings detected</div>;
+    return <div className="p-8 text-center text-stone-500 italic">No removed listings detected</div>;
   }
 
   return (
     <>
-      <div className="divide-y divide-gray-100">
+      <div className="divide-y divide-stone-200/40">
         {data.data.map((l) => (
           <Link
             key={l.adId}
             href={`/listings/${l.adId}`}
-            className="flex items-center gap-4 px-5 py-3 hover:bg-red-50 transition-colors bg-red-50/30"
+            className="flex items-center gap-4 px-5 py-3 hover:bg-rose-50/40 transition-colors bg-rose-50/20"
           >
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-red-700 truncate">{l.title || l.adId}</p>
+              <p className="text-sm font-medium text-rose-800 truncate">{l.title || l.adId}</p>
               <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
                 <span>{l.subcategory}</span>
                 {l.location && <><span>&middot;</span><span>{l.location}</span></>}
@@ -529,8 +537,8 @@ function RemovedListingsTab({ data, onPageChange }: { data: CrawlLiveData['remov
               </div>
             </div>
             <div className="text-right flex-shrink-0">
-              <p className="text-sm font-semibold text-gray-900">{formatPrice(l.price)}</p>
-              <p className="text-xs text-red-400">Removed {formatTimeShort(l.removedAt)}</p>
+              <p className="text-sm font-semibold text-stone-900 tabular-nums">{formatPrice(l.price)}</p>
+              <p className="text-xs text-rose-500">Removed {formatTimeShort(l.removedAt)}</p>
             </div>
           </Link>
         ))}
@@ -542,26 +550,26 @@ function RemovedListingsTab({ data, onPageChange }: { data: CrawlLiveData['remov
 
 function ErrorsTab({ data, onPageChange }: { data: CrawlLiveData['errors']; onPageChange: (p: number) => void }) {
   if (data.data.length === 0) {
-    return <div className="p-8 text-center text-gray-500">No errors</div>;
+    return <div className="p-8 text-center text-stone-500 italic">No errors</div>;
   }
 
   return (
     <>
-      <div className="divide-y divide-gray-100">
+      <div className="divide-y divide-stone-200/40">
         {data.data.map((e, i) => (
           <div key={i} className="px-5 py-3">
             <div className="flex items-center gap-2 mb-1">
-              <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
-                e.type === 'blocked' ? 'bg-red-100 text-red-700' :
-                e.type === 'http_error' ? 'bg-orange-100 text-orange-700' :
-                'bg-gray-100 text-gray-700'
-              }`}>
-                {e.type}{e.statusCode ? ` ${e.statusCode}` : ''}
+              <span className={
+                e.type === 'blocked' ? 'aurora-chip aurora-chip-warn' :
+                e.type === 'http_error' ? 'aurora-chip aurora-chip-warn' :
+                'aurora-chip aurora-chip-slate'
+              }>
+                {e.type}{e.statusCode ? ` · ${e.statusCode}` : ''}
               </span>
-              <span className="text-xs text-gray-400">{formatTimeShort(e.occurredAt)}</span>
+              <span className="text-xs text-stone-400">{formatTimeShort(e.occurredAt)}</span>
             </div>
-            <p className="text-sm text-gray-700 truncate">{e.url}</p>
-            {e.message && <p className="text-xs text-gray-500 truncate mt-0.5">{e.message}</p>}
+            <p className="text-sm text-stone-700 truncate">{e.url}</p>
+            {e.message && <p className="text-xs text-stone-500 truncate mt-0.5">{e.message}</p>}
           </div>
         ))}
       </div>

@@ -1,8 +1,18 @@
 'use client';
 
 import { Suspense } from 'react';
+import { Fraunces } from 'next/font/google';
 import { useUser } from '@stackframe/stack';
 import { Sidebar } from '@/components/layout/Sidebar';
+import './aurora-skin.css';
+
+const fraunces = Fraunces({
+  subsets: ['latin'],
+  variable: '--font-fraunces',
+  weight: ['300', '400', '500', '600'],
+  style: ['normal', 'italic'],
+  display: 'swap',
+});
 
 function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   const user = useUser({ or: 'redirect' });
@@ -10,9 +20,9 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   if (!user) return null;
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className={`${fraunces.variable} aurora-skin flex h-screen overflow-hidden`}>
       <Sidebar />
-      <main className="flex-1 overflow-auto bg-gray-50 pt-14 md:pt-0">
+      <main className="aurora-bg flex-1 overflow-auto pt-14 md:pt-0">
         {children}
       </main>
     </div>
@@ -26,8 +36,8 @@ export default function AppLayout({
 }) {
   return (
     <Suspense fallback={
-      <div className="flex items-center justify-center h-screen bg-gray-50">
-        <div className="text-gray-500">Loading...</div>
+      <div className={`${fraunces.variable} aurora-skin aurora-bg flex items-center justify-center h-screen`}>
+        <div className="font-serif italic text-stone-500 text-lg">Loading…</div>
       </div>
     }>
       <AuthenticatedLayout>{children}</AuthenticatedLayout>

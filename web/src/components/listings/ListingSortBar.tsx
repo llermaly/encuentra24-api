@@ -13,19 +13,34 @@ export function ListingSortBar({ searchParams, onUpdate, total, isLoading }: Lis
   const sort = searchParams.get('sort') || 'published_desc';
 
   return (
-    <div className="flex items-center justify-between mb-4">
-      <p className="text-sm text-gray-600">
-        {isLoading ? 'Loading...' : `${total?.toLocaleString() ?? 0} listings found`}
+    <div className="flex items-center justify-between mb-5">
+      <p className="text-sm text-stone-600">
+        {isLoading ? (
+          <span className="inline-flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-stone-400 animate-pulse" />
+            Loading…
+          </span>
+        ) : (
+          <>
+            <span className="font-serif text-stone-900 text-lg tabular-nums mr-1">
+              {total?.toLocaleString() ?? 0}
+            </span>
+            properties
+          </>
+        )}
       </p>
-      <select
-        value={sort}
-        onChange={e => onUpdate({ sort: e.target.value })}
-        className="px-3 py-1.5 text-sm border border-gray-300 rounded bg-white text-gray-900"
-      >
-        {SORT_OPTIONS.map(opt => (
-          <option key={opt.value} value={opt.value}>{opt.label}</option>
-        ))}
-      </select>
+      <div className="flex items-center gap-2">
+        <span className="text-[11px] uppercase tracking-wider text-stone-500 font-medium">Sort</span>
+        <select
+          value={sort}
+          onChange={e => onUpdate({ sort: e.target.value })}
+          className="aurora-input min-w-[160px]"
+        >
+          {SORT_OPTIONS.map(opt => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      </div>
     </div>
   );
 }

@@ -1,10 +1,22 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useUser } from '@stackframe/stack';
-import { formatPrice, formatRelativeDate, formatArea } from '@/lib/formatters';
 import Link from 'next/link';
+import { formatRelativeDate } from '@/lib/formatters';
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  PieChart,
+  Pie,
+  Cell,
+} from 'recharts';
 
 interface ListingItem {
   adId: string;
@@ -18,25 +30,23 @@ interface ListingItem {
   firstSeenAt: string;
 }
 
-interface CategoryRow {
-  category: string;
-  subcategory: string;
-  total: number;
-  active: number;
-  avgPrice: number | null;
-  minPrice: number | null;
-  maxPrice: number | null;
-  newThisWeek: number;
-}
-
-interface LocationRow {
-  city: string;
-  location: string | null;
-  category: string;
-  subcategory: string;
-  active: number;
-  avgPrice: number | null;
-  newThisWeek: number;
+interface SummaryData {
+  stats: {
+    activeListings: number;
+    newToday: number;
+    newThisWeek: number;
+    totalFavorites: number;
+    avgPriceSale: number | null;
+    avgPriceRent: number | null;
+    activeSellers: number;
+  };
+  latestListings: ListingItem[];
+  lastCrawl: {
+    status: string;
+    startedAt: string;
+    durationSecs: number | null;
+    listingsNew: number;
+  } | null;
 }
 
 interface SavedSearchPreview {
@@ -46,452 +56,45 @@ interface SavedSearchPreview {
   listings: ListingItem[];
 }
 
-function formatCompactPrice(price: number | null | undefined): string {
-  if (price == null) return '—';
-  if (price >= 1_000_000) return `$${(price / 1_000_000).toFixed(1)}M`;
-  if (price >= 1_000) return `$${(price / 1_000).toFixed(0)}K`;
-  return `$${price.toFixed(0)}`;
+interface SearchesData {
+  savedSearches: SavedSearchPreview[];
+  lastCrawlStart: string | null;
 }
 
-type Tab = 'summary' | 'market' | 'searches';
-
-export default function DashboardPage() {
-  useUser({ or: 'redirect' });
-  const [tab, setTab] = useState<Tab>('summary');
-
-  return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold text-gray-900 mb-4">Dashboard</h1>
-
-      {/* Tabs */}
-      <div className="flex gap-1 mb-6 border-b">
-        {([
-          { key: 'summary' as Tab, label: 'Summary' },
-          { key: 'market' as Tab, label: 'Market Overview' },
-          { key: 'searches' as Tab, label: 'Saved Searches' },
-        ]).map(t => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-              tab === t.key
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {tab === 'summary' && <SummaryTab />}
-      {tab === 'market' && <MarketTab />}
-      {tab === 'searches' && <SearchesTab />}
-    </div>
-  );
+interface TrendsData {
+  dailyTrend: Array<{ day: string; added: number; removed: number }>;
+  topCities: Array<{ city: string; active: number; newThisWeek: number; avgSale: number | null; avgRent: number | null }>;
+  recentCrawls: Array<{ id: number; status: string; startedAt: string; listingsNew: number; durationSecs: number | null }>;
+  priceDistribution: Array<{ bucket: string; count: number }>;
+  categoryShare: Array<{ category: string; active: number }>;
 }
 
-/* ─── Summary Tab ────────────────────────────────────────────────────────── */
+const PALETTE = {
+  ink: '#1a1a1a',
+  sage: '#6b8e6b',
+  sageDeep: '#4a6b4a',
+  sageSoft: '#c8dcc7',
+  sand: '#c9b896',
+  sandSoft: '#ebe4cd',
+  slate: '#94a3b8',
+  slateSoft: '#cfd8e3',
+};
 
-function SummaryTab() {
-  const { data, isLoading } = useQuery({
-    queryKey: ['dashboard', 'summary'],
-    queryFn: () => fetch('/api/dashboard?tab=summary').then(r => r.json()),
-  });
-
-  if (isLoading || !data) {
-    return (
-      <div className="animate-pulse space-y-4">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => <div key={i} className="h-24 bg-gray-200 rounded-lg" />)}
-        </div>
-        <div className="h-64 bg-gray-200 rounded-lg" />
-      </div>
-    );
-  }
-
-  const { stats, latestListings, lastCrawl } = data;
-
-  return (
-    <div className="space-y-6">
-      {/* Stats row */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        <StatCard label="Active Listings" value={stats.activeListings.toLocaleString()} />
-        <StatCard label="New This Week" value={stats.newThisWeek.toLocaleString()} accent />
-        <StatCard label="Avg Sale Price" value={formatCompactPrice(stats.avgPriceSale)} />
-        <StatCard label="Avg Rent Price" value={formatCompactPrice(stats.avgPriceRent)} />
-        <StatCard label="Active Sellers" value={stats.activeSellers.toLocaleString()} />
-      </div>
-
-      {/* Last crawl */}
-      {lastCrawl && (
-        <div className="bg-white rounded-lg border p-4">
-          <h2 className="text-lg font-semibold text-gray-900 mb-2">Last Crawl</h2>
-          <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-gray-600">
-            <span>Status: <span className={lastCrawl.status === 'completed' ? 'text-green-600 font-medium' : 'text-yellow-600 font-medium'}>{lastCrawl.status}</span></span>
-            <span>Started: {formatRelativeDate(lastCrawl.startedAt)}</span>
-            {lastCrawl.durationSecs && <span>Duration: {lastCrawl.durationSecs}s</span>}
-            {lastCrawl.listingsNew > 0 && <span className="text-green-600 font-medium">+{lastCrawl.listingsNew} new</span>}
-            <Link href="/crawl-history" className="text-blue-600 hover:underline">View history</Link>
-          </div>
-        </div>
-      )}
-
-      {/* Newest Properties */}
-      {(latestListings ?? []).length > 0 && (
-        <div className="bg-white rounded-lg border p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold text-gray-900">Newest Properties</h2>
-            <Link href="/listings?sort=newest" className="text-sm text-blue-600 hover:underline">View all</Link>
-          </div>
-          <div className="space-y-3">
-            {latestListings.map((listing: ListingItem) => (
-              <ListingRow key={listing.adId} listing={listing} />
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
+function compactPrice(p: number | null | undefined): string {
+  if (p == null) return '—';
+  if (p >= 1_000_000) return `$${(p / 1_000_000).toFixed(2)}M`;
+  if (p >= 1_000) return `$${(p / 1_000).toFixed(0)}K`;
+  return `$${Math.round(p)}`;
 }
 
-/* ─── Market Tab ─────────────────────────────────────────────────────────── */
-
-function MarketTab() {
-  const { data, isLoading } = useQuery({
-    queryKey: ['dashboard', 'market'],
-    queryFn: () => fetch('/api/dashboard?tab=market').then(r => r.json()),
-  });
-
-  if (isLoading || !data) {
-    return (
-      <div className="animate-pulse space-y-4">
-        <div className="h-64 bg-gray-200 rounded-lg" />
-        <div className="h-64 bg-gray-200 rounded-lg" />
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      <LocationExplorer rows={data.locationBreakdown} />
-      <CategoryBreakdown rows={data.categoryBreakdown} />
-    </div>
-  );
-}
-
-/* ─── Searches Tab ───────────────────────────────────────────────────────── */
-
-function SearchesTab() {
-  const { data, isLoading } = useQuery<{ savedSearches: SavedSearchPreview[]; lastCrawlStart: string | null }>({
-    queryKey: ['dashboard', 'searches'],
-    queryFn: () => fetch('/api/dashboard?tab=searches').then(r => r.json()),
-  });
-
-  if (isLoading || !data) {
-    return <div className="animate-pulse h-64 bg-gray-200 rounded-lg" />;
-  }
-
-  const savedSearches = data.savedSearches ?? [];
-  const lastCrawlStart = data.lastCrawlStart ?? null;
-
-  if (savedSearches.length === 0) {
-    return (
-      <div className="bg-white rounded-lg border p-8 text-center">
-        <p className="text-gray-500">No saved searches yet.</p>
-        <p className="text-sm text-gray-400 mt-1">
-          Save a search from the{' '}
-          <Link href="/listings" className="text-blue-600 hover:underline">listings page</Link>
-          {' '}to track new matches.
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      {savedSearches.map((search) => (
-        <SavedSearchBox key={search.id} search={search} lastCrawlStart={lastCrawlStart} />
-      ))}
-    </div>
-  );
-}
-
-/* ─── Category Breakdown ──────────────────────────────────────────────────── */
-
-function CategoryBreakdown({ rows }: { rows: CategoryRow[] }) {
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
-
-  if (!rows || rows.length === 0) return null;
-
-  const grouped: Record<string, CategoryRow[]> = {};
-  for (const row of rows) {
-    if (!grouped[row.category]) grouped[row.category] = [];
-    grouped[row.category].push(row);
-  }
-
-  const toggleCategory = (cat: string) => {
-    setExpandedCategories(prev => {
-      const next = new Set(prev);
-      if (next.has(cat)) next.delete(cat);
-      else next.add(cat);
-      return next;
-    });
-  };
-
-  return (
-    <div className="bg-white rounded-lg border">
-      <div className="p-4 border-b">
-        <h2 className="text-lg font-semibold text-gray-900">Category Breakdown</h2>
-      </div>
-      <div className="divide-y">
-        {Object.entries(grouped).map(([category, subcategories]) => {
-          const isExpanded = expandedCategories.has(category);
-          const catTotal = subcategories.reduce((s, r) => s + r.active, 0);
-          const catNewWeek = subcategories.reduce((s, r) => s + r.newThisWeek, 0);
-          const prices = subcategories.filter(r => r.avgPrice != null).map(r => r.avgPrice!);
-          const catAvgPrice = prices.length > 0 ? prices.reduce((a, b) => a + b, 0) / prices.length : null;
-
-          return (
-            <div key={category}>
-              <button
-                onClick={() => toggleCategory(category)}
-                className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors"
-              >
-                <div className="flex items-center gap-2">
-                  <svg className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                  <span className="font-medium text-gray-900 capitalize">{category}</span>
-                  <span className="text-xs text-gray-400">{subcategories.length} subcategories</span>
-                </div>
-                <div className="flex items-center gap-4 text-sm">
-                  <span className="text-gray-600">{catTotal.toLocaleString()} active</span>
-                  <span className="text-gray-500">{formatCompactPrice(catAvgPrice)} avg</span>
-                  {catNewWeek > 0 && (
-                    <span className="text-xs font-medium bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">+{catNewWeek} this week</span>
-                  )}
-                </div>
-              </button>
-              {isExpanded && (
-                <div className="bg-gray-50 border-t">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-xs text-gray-500 uppercase">
-                        <th className="text-left px-4 py-2 font-medium">Subcategory</th>
-                        <th className="text-right px-4 py-2 font-medium">Active</th>
-                        <th className="text-right px-4 py-2 font-medium">Avg Price</th>
-                        <th className="text-right px-4 py-2 font-medium hidden sm:table-cell">Min</th>
-                        <th className="text-right px-4 py-2 font-medium hidden sm:table-cell">Max</th>
-                        <th className="text-right px-4 py-2 font-medium">New</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {subcategories.map(row => (
-                        <tr key={row.subcategory} className="hover:bg-gray-100 transition-colors">
-                          <td className="px-4 py-2">
-                            <Link href={`/listings?category=${encodeURIComponent(row.category)}&subcategory=${encodeURIComponent(row.subcategory)}`} className="text-blue-600 hover:underline capitalize">
-                              {row.subcategory.replace(/-/g, ' ')}
-                            </Link>
-                          </td>
-                          <td className="text-right px-4 py-2 text-gray-700">{row.active.toLocaleString()}</td>
-                          <td className="text-right px-4 py-2 text-gray-700">{formatCompactPrice(row.avgPrice)}</td>
-                          <td className="text-right px-4 py-2 text-gray-500 hidden sm:table-cell">{formatCompactPrice(row.minPrice)}</td>
-                          <td className="text-right px-4 py-2 text-gray-500 hidden sm:table-cell">{formatCompactPrice(row.maxPrice)}</td>
-                          <td className="text-right px-4 py-2">
-                            {row.newThisWeek > 0 ? <span className="text-blue-600 font-medium">+{row.newThisWeek}</span> : <span className="text-gray-400">0</span>}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-/* ─── Location Explorer ───────────────────────────────────────────────────── */
-
-interface CityData {
-  totalActive: number;
-  totalNew: number;
-  avgPrice: number | null;
-  locations: Record<string, LocationData>;
-}
-
-interface LocationData {
-  totalActive: number;
-  totalNew: number;
-  avgPrice: number | null;
-  categories: Array<{ category: string; subcategory: string; active: number; avgPrice: number | null; newThisWeek: number }>;
-}
-
-function LocationExplorer({ rows }: { rows: LocationRow[] }) {
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [showAllCities, setShowAllCities] = useState(false);
-
-  if (!rows || rows.length === 0) return null;
-
-  const cityMap: Record<string, CityData> = {};
-  for (const row of rows) {
-    if (!cityMap[row.city]) cityMap[row.city] = { totalActive: 0, totalNew: 0, avgPrice: null, locations: {} };
-    const city = cityMap[row.city];
-    city.totalActive += row.active;
-    city.totalNew += row.newThisWeek;
-    const locKey = row.location || '_other';
-    if (!city.locations[locKey]) city.locations[locKey] = { totalActive: 0, totalNew: 0, avgPrice: null, categories: [] };
-    const loc = city.locations[locKey];
-    loc.totalActive += row.active;
-    loc.totalNew += row.newThisWeek;
-    loc.categories.push({ category: row.category, subcategory: row.subcategory, active: row.active, avgPrice: row.avgPrice, newThisWeek: row.newThisWeek });
-  }
-
-  for (const city of Object.values(cityMap)) {
-    let wSum = 0, wTotal = 0;
-    for (const loc of Object.values(city.locations)) {
-      const priced = loc.categories.filter(c => c.avgPrice != null);
-      if (priced.length > 0) {
-        const ws = priced.reduce((s, c) => s + (c.avgPrice! * c.active), 0);
-        const ta = priced.reduce((s, c) => s + c.active, 0);
-        loc.avgPrice = ta > 0 ? ws / ta : null;
-        wSum += ws; wTotal += ta;
-      }
-    }
-    city.avgPrice = wTotal > 0 ? wSum / wTotal : null;
-  }
-
-  const sortedCities = Object.entries(cityMap).sort((a, b) => b[1].totalActive - a[1].totalActive);
-  const visibleCities = showAllCities ? sortedCities : sortedCities.slice(0, 10);
-
-  const toggle = (key: string) => {
-    setExpanded(prev => { const next = new Set(prev); if (next.has(key)) next.delete(key); else next.add(key); return next; });
-  };
-
-  return (
-    <div className="bg-white rounded-lg border">
-      <div className="p-4 border-b"><h2 className="text-lg font-semibold text-gray-900">Location Explorer</h2></div>
-      <div className="divide-y">
-        {visibleCities.map(([cityName, city]) => {
-          const cityExpanded = expanded.has(`c:${cityName}`);
-          const sortedLocations = Object.entries(city.locations).sort((a, b) => b[1].totalActive - a[1].totalActive);
-          return (
-            <div key={cityName}>
-              <button onClick={() => toggle(`c:${cityName}`)} className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors">
-                <div className="flex items-center gap-2">
-                  <svg className={`w-4 h-4 text-gray-400 transition-transform ${cityExpanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                  <Link href={`/listings?city=${encodeURIComponent(cityName)}`} onClick={e => e.stopPropagation()} className="font-medium text-gray-900 hover:text-blue-600">{cityName}</Link>
-                  <span className="text-xs text-gray-400">{sortedLocations.length} areas</span>
-                </div>
-                <div className="flex items-center gap-4 text-sm">
-                  <span className="text-gray-600">{city.totalActive.toLocaleString()} active</span>
-                  <span className="text-gray-500">{formatCompactPrice(city.avgPrice)} avg</span>
-                  {city.totalNew > 0 && <span className="text-xs font-medium bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">+{city.totalNew} this week</span>}
-                </div>
-              </button>
-              {cityExpanded && (() => {
-                const showAll = expanded.has(`showAll:${cityName}`);
-                const visible = showAll ? sortedLocations : sortedLocations.slice(0, 10);
-                const hidden = sortedLocations.length - 10;
-                return (
-                  <div className="border-t bg-gray-50">
-                    {visible.map(([locKey, loc]) => {
-                      const locName = locKey === '_other' ? 'Other' : locKey;
-                      const locExpanded = expanded.has(`l:${cityName}:${locKey}`);
-                      const sortedCats = [...loc.categories].sort((a, b) => b.active - a.active);
-                      return (
-                        <div key={locKey} className="border-b border-gray-100 last:border-b-0">
-                          <button onClick={() => toggle(`l:${cityName}:${locKey}`)} className="w-full flex items-center justify-between px-4 pl-10 py-2.5 hover:bg-gray-100 transition-colors">
-                            <div className="flex items-center gap-2">
-                              <svg className={`w-3.5 h-3.5 text-gray-400 transition-transform ${locExpanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                              <Link href={`/listings?city=${encodeURIComponent(cityName)}&location=${encodeURIComponent(locKey === '_other' ? '' : locKey)}`} onClick={e => e.stopPropagation()} className="text-sm text-gray-800 hover:text-blue-600">{locName}</Link>
-                            </div>
-                            <div className="flex items-center gap-4 text-sm">
-                              <span className="text-gray-600">{loc.totalActive.toLocaleString()}</span>
-                              <span className="text-gray-500">{formatCompactPrice(loc.avgPrice)}</span>
-                              {loc.totalNew > 0 && <span className="text-xs text-blue-600 font-medium">+{loc.totalNew}</span>}
-                            </div>
-                          </button>
-                          {locExpanded && (
-                            <div className="bg-white border-t border-gray-100">
-                              <table className="w-full text-xs">
-                                <thead><tr className="text-gray-400 uppercase"><th className="text-left pl-16 pr-4 py-1.5 font-medium">Type</th><th className="text-right px-4 py-1.5 font-medium">Active</th><th className="text-right px-4 py-1.5 font-medium">Avg Price</th><th className="text-right px-4 py-1.5 font-medium">New</th></tr></thead>
-                                <tbody className="divide-y divide-gray-50">
-                                  {sortedCats.map(cat => (
-                                    <tr key={`${cat.category}-${cat.subcategory}`} className="hover:bg-gray-50">
-                                      <td className="pl-16 pr-4 py-1.5"><Link href={`/listings?city=${encodeURIComponent(cityName)}&location=${encodeURIComponent(locKey === '_other' ? '' : locKey)}&category=${encodeURIComponent(cat.category)}&subcategory=${encodeURIComponent(cat.subcategory)}`} className="text-blue-600 hover:underline capitalize">{cat.subcategory.replace(/-/g, ' ')}</Link><span className="text-gray-400 ml-1 capitalize">({cat.category})</span></td>
-                                      <td className="text-right px-4 py-1.5 text-gray-700">{cat.active}</td>
-                                      <td className="text-right px-4 py-1.5 text-gray-700">{formatCompactPrice(cat.avgPrice)}</td>
-                                      <td className="text-right px-4 py-1.5">{cat.newThisWeek > 0 ? <span className="text-blue-600 font-medium">+{cat.newThisWeek}</span> : <span className="text-gray-400">0</span>}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                    {!showAll && hidden > 0 && (
-                      <button onClick={() => toggle(`showAll:${cityName}`)} className="w-full py-2.5 pl-10 text-xs text-blue-600 hover:text-blue-800 hover:bg-gray-100 transition-colors text-left">Show {hidden} more areas</button>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
-          );
-        })}
-        {!showAllCities && sortedCities.length > 10 && (
-          <button onClick={() => setShowAllCities(true)} className="w-full py-3 text-sm text-blue-600 hover:text-blue-800 hover:bg-gray-50 transition-colors">Show {sortedCities.length - 10} more cities</button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/* ─── Saved Searches ──────────────────────────────────────────────────────── */
-
-function SavedSearchBox({ search, lastCrawlStart }: { search: SavedSearchPreview; lastCrawlStart: string | null }) {
-  const [expanded, setExpanded] = useState(false);
-  const searchListings = search.listings ?? [];
-  const newCount = lastCrawlStart ? searchListings.filter(l => l.firstSeenAt >= lastCrawlStart).length : 0;
-  const visible = expanded ? searchListings : searchListings.slice(0, 5);
-  const hasMore = searchListings.length > 5;
-  const params = getSearchParams(search.filters);
-
-  return (
-    <div className="bg-white rounded-lg border p-4">
-      <div className="flex items-center justify-between mb-3">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900">{search.name}</h2>
-          <p className="text-sm text-gray-500">{formatFilterSummary(search.filters)}</p>
-        </div>
-        <div className="flex items-center gap-3">
-          {newCount > 0 && <span className="text-xs font-medium bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{newCount} new</span>}
-          <Link href={`/listings?${params.toString()}`} className="text-sm text-blue-600 hover:underline">View all</Link>
-        </div>
-      </div>
-      {searchListings.length === 0 ? (
-        <p className="text-gray-500 text-sm">No listings match this search.</p>
-      ) : (
-        <div className="space-y-3">
-          {visible.map(listing => <ListingRow key={listing.adId} listing={listing} isNew={!!lastCrawlStart && listing.firstSeenAt >= lastCrawlStart} />)}
-          {hasMore && !expanded && (
-            <button onClick={() => setExpanded(true)} className="w-full text-sm text-blue-600 hover:text-blue-800 py-2">Show {searchListings.length - 5} more</button>
-          )}
-        </div>
-      )}
-    </div>
-  );
+function formatDayLabel(iso: unknown): string {
+  if (typeof iso !== 'string') return '';
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 function getSearchParams(filtersJson: string): URLSearchParams {
   const params = new URLSearchParams();
-
   try {
     const filters = JSON.parse(filtersJson) as Record<string, unknown>;
     for (const [key, value] of Object.entries(filters)) {
@@ -500,61 +103,501 @@ function getSearchParams(filtersJson: string): URLSearchParams {
   } catch {
     return params;
   }
-
   return params;
 }
 
-function formatFilterSummary(filtersJson: string): string {
+function formatFilterSummary(filtersJson: string): Array<{ key: string; label: string }> {
   try {
-    const filters = JSON.parse(filtersJson) as Record<string, unknown>;
-    const parts: string[] = [];
-
-    if (typeof filters.q === 'string' && filters.q) parts.push(`"${filters.q}"`);
-    if (typeof filters.category === 'string' && filters.category) parts.push(filters.category);
-    if (typeof filters.subcategory === 'string' && filters.subcategory) parts.push(filters.subcategory);
-    if (filters.priceMin || filters.priceMax) parts.push(`$${filters.priceMin || '0'}-${filters.priceMax || '∞'}`);
-    if (filters.bedroomsMin) parts.push(`${filters.bedroomsMin}+ bd`);
-    if (typeof filters.location === 'string' && filters.location) parts.push(filters.location);
-    if (typeof filters.province === 'string' && filters.province) parts.push(filters.province);
-
-    return parts.join(' · ') || 'All listings';
+    const f = JSON.parse(filtersJson) as Record<string, unknown>;
+    const chips: Array<{ key: string; label: string }> = [];
+    if (typeof f.q === 'string' && f.q) chips.push({ key: 'q', label: `"${f.q}"` });
+    if (typeof f.category === 'string' && f.category) chips.push({ key: 'cat', label: f.category });
+    if (typeof f.subcategory === 'string' && f.subcategory) chips.push({ key: 'sub', label: f.subcategory.replace(/-/g, ' ') });
+    if (f.priceMin || f.priceMax) chips.push({ key: 'price', label: `$${f.priceMin || '0'}–$${f.priceMax || '∞'}` });
+    if (f.bedroomsMin) chips.push({ key: 'bd', label: `${f.bedroomsMin}+ bd` });
+    if (typeof f.location === 'string' && f.location) chips.push({ key: 'loc', label: f.location });
+    if (typeof f.city === 'string' && f.city) chips.push({ key: 'city', label: f.city });
+    return chips;
   } catch {
-    return 'All listings';
+    return [];
   }
 }
 
-/* ─── Shared Components ───────────────────────────────────────────────────── */
+export default function AuroraDashboard() {
+  useUser({ or: 'redirect' });
 
-function ListingRow({ listing, isNew }: { listing: ListingItem; isNew?: boolean }) {
+  const summary = useQuery<SummaryData>({
+    queryKey: ['dashboard', 'summary'],
+    queryFn: () => fetch('/api/dashboard?tab=summary').then((r) => r.json()),
+  });
+  const trends = useQuery<TrendsData>({
+    queryKey: ['dashboard', 'trends'],
+    queryFn: () => fetch('/api/dashboard/trends').then((r) => r.json()),
+  });
+  const searches = useQuery<SearchesData>({
+    queryKey: ['dashboard', 'searches'],
+    queryFn: () => fetch('/api/dashboard?tab=searches').then((r) => r.json()),
+  });
+
   return (
-    <Link href={`/listings/${listing.adId}`} className={`flex items-center gap-3 p-2 rounded hover:bg-gray-50 ${isNew ? 'bg-blue-50 border border-blue-200' : ''}`}>
-      {listing.thumbnail ? (
-        <img src={listing.thumbnail} alt="" className="w-12 h-12 rounded object-cover" />
-      ) : (
-        <div className="w-12 h-12 rounded bg-gray-100 flex items-center justify-center text-gray-400 text-xs">No img</div>
+    <div className="relative min-h-full">
+      <div className="px-8 py-10 max-w-[1400px] mx-auto">
+        <Header />
+
+        <section className="mt-10">
+          <Hero summary={summary.data} loading={summary.isLoading} />
+        </section>
+
+        {/* Saved searches — the most-used feature, given hero placement */}
+        <section className="mt-10">
+          <SavedSearchesBoard data={searches.data} loading={searches.isLoading} />
+        </section>
+
+        <section className="mt-10 grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+          <div className="lg:col-span-2 h-full">
+            <TrendChart data={trends.data?.dailyTrend ?? []} loading={trends.isLoading} />
+          </div>
+          <div className="h-full">
+            <CategoryShare data={trends.data?.categoryShare ?? []} loading={trends.isLoading} />
+          </div>
+        </section>
+
+        <section className="mt-10 grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+          <div className="lg:col-span-2 h-full">
+            <CityGrid cities={trends.data?.topCities ?? []} loading={trends.isLoading} />
+          </div>
+          <div className="h-full">
+            <FeaturedListings listings={summary.data?.latestListings ?? []} loading={summary.isLoading} />
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function Header() {
+  const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  return (
+    <div className="flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <p className="text-xs uppercase tracking-[0.3em] text-stone-500 font-medium">{today}</p>
+        <h1 className="mt-2 font-serif text-5xl md:text-6xl font-light tracking-tight text-stone-900 leading-[1.05]">
+          Good morning.<br />
+          <span className="italic text-stone-700">Here&rsquo;s your market.</span>
+        </h1>
+      </div>
+      <div className="flex items-center gap-2">
+        <Link href="/listings" className="aurora-pill aurora-pill-primary">
+          Browse listings →
+        </Link>
+        <Link href="/saved-searches" className="aurora-pill aurora-pill-ghost">
+          Manage searches
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function Hero({ summary, loading }: { summary: SummaryData | undefined; loading: boolean }) {
+  if (loading || !summary) {
+    return <div className="h-32 rounded-3xl aurora-surface animate-pulse" />;
+  }
+  const s = summary.stats;
+
+  const heroStats = [
+    { label: 'Active inventory', value: s.activeListings.toLocaleString(), accent: PALETTE.sageSoft },
+    { label: 'New this week', value: `+${s.newThisWeek.toLocaleString()}`, accent: PALETTE.sageSoft, badge: `+${s.newToday} today` },
+    { label: 'Avg sale price', value: compactPrice(s.avgPriceSale), accent: PALETTE.sandSoft },
+    { label: 'Avg rent price', value: compactPrice(s.avgPriceRent), accent: PALETTE.slateSoft },
+    { label: 'Active sellers', value: s.activeSellers.toLocaleString(), accent: PALETTE.sageSoft },
+  ];
+
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+      {heroStats.map((h) => (
+        <div
+          key={h.label}
+          className="group relative overflow-hidden rounded-3xl aurora-surface p-6 transition-all hover:-translate-y-0.5 hover:shadow-lg"
+        >
+          <div
+            className="absolute -top-12 -right-12 h-28 w-28 rounded-full opacity-50 blur-2xl group-hover:opacity-80 transition-opacity"
+            style={{ background: h.accent }}
+          />
+          <div className="relative">
+            <p className="text-[10px] uppercase tracking-[0.2em] text-stone-500 font-medium">{h.label}</p>
+            <p className="mt-3 font-serif text-4xl font-light text-stone-900 tracking-tight tabular-nums">{h.value}</p>
+            {h.badge && (
+              <span className="mt-2 inline-block aurora-chip aurora-chip-mint">
+                {h.badge}
+              </span>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SavedSearchesBoard({ data, loading }: { data: SearchesData | undefined; loading: boolean }) {
+  const [active, setActive] = useState<number | null>(null);
+
+  if (loading) {
+    return <div className="h-72 rounded-3xl aurora-surface animate-pulse" />;
+  }
+
+  const searches = data?.savedSearches ?? [];
+  const lastCrawlStart = data?.lastCrawlStart ?? null;
+
+  if (searches.length === 0) {
+    return (
+      <div className="rounded-3xl aurora-surface p-8 text-center">
+        <div className="inline-flex items-center justify-center w-14 h-14 rounded-full mb-3"
+             style={{ background: 'linear-gradient(135deg, #ecf3ec, #ebe4cd)' }}>
+          <svg className="w-6 h-6 text-stone-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-4-7 4V5z" />
+          </svg>
+        </div>
+        <p className="font-serif text-2xl text-stone-900">No saved searches yet</p>
+        <p className="text-sm text-stone-500 mt-1">
+          Save a filter from the{' '}
+          <Link href="/listings" className="text-stone-900 underline-offset-4 hover:underline">browse page</Link>{' '}
+          to track new matches here.
+        </p>
+      </div>
+    );
+  }
+
+  // Default to the search with the most new since last crawl
+  const enrichedSearches = searches.map((s) => {
+    const newCount = lastCrawlStart
+      ? s.listings.filter((l) => l.firstSeenAt >= lastCrawlStart).length
+      : 0;
+    return { ...s, newCount };
+  });
+  const activeId = active ?? enrichedSearches[0]?.id ?? null;
+  const activeSearch = enrichedSearches.find((s) => s.id === activeId) ?? enrichedSearches[0];
+  const activeChips = activeSearch ? formatFilterSummary(activeSearch.filters) : [];
+  const activeListings = activeSearch?.listings ?? [];
+  const activeListingsVisible = activeListings.slice(0, 6);
+
+  return (
+    <div className="rounded-3xl aurora-surface overflow-hidden">
+      <div className="px-6 py-5 flex flex-wrap items-center justify-between gap-3 border-b border-stone-200/60">
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.3em] text-stone-500 font-medium">Watching</p>
+          <h2 className="font-serif text-2xl text-stone-900 mt-1">
+            <span className="aurora-rule">Latest from your saved searches</span>
+          </h2>
+        </div>
+        <Link href="/saved-searches" className="aurora-pill aurora-pill-ghost">
+          Manage all →
+        </Link>
+      </div>
+
+      {/* Search tabs */}
+      <div className="px-6 pt-4 pb-2 flex flex-wrap gap-2">
+        {enrichedSearches.map((s) => {
+          const isActive = s.id === activeId;
+          return (
+            <button
+              key={s.id}
+              onClick={() => setActive(s.id)}
+              className={`aurora-pill ${isActive ? 'aurora-pill-primary' : 'aurora-pill-ghost'}`}
+            >
+              <span className="truncate max-w-[160px]">{s.name}</span>
+              {s.newCount > 0 && (
+                <span
+                  className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] tabular-nums ${
+                    isActive ? 'bg-white/20 text-white' : 'bg-emerald-100 text-emerald-700'
+                  }`}
+                >
+                  +{s.newCount}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {activeSearch && (
+        <div className="px-6 pt-2 pb-6">
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            {activeChips.map((c) => (
+              <span key={c.key} className="aurora-chip capitalize">{c.label}</span>
+            ))}
+            {activeChips.length === 0 && <span className="aurora-chip">All listings</span>}
+            <Link
+              href={`/listings?${getSearchParams(activeSearch.filters).toString()}`}
+              className="ml-auto text-sm text-stone-600 hover:text-stone-900 underline-offset-4 hover:underline"
+            >
+              View {activeListings.length}+ matches →
+            </Link>
+          </div>
+
+          {activeListingsVisible.length === 0 ? (
+            <p className="text-sm text-stone-500 py-8 text-center italic">No listings match this search yet.</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {activeListingsVisible.map((listing) => {
+                const isNew = !!lastCrawlStart && listing.firstSeenAt >= lastCrawlStart;
+                return <SavedSearchListingCard key={listing.adId} listing={listing} isNew={isNew} />;
+              })}
+            </div>
+          )}
+        </div>
       )}
+    </div>
+  );
+}
+
+function SavedSearchListingCard({ listing, isNew }: { listing: ListingItem; isNew: boolean }) {
+  return (
+    <Link
+      href={`/listings/${listing.adId}`}
+      className={`group flex gap-3 p-3 rounded-2xl transition-all border ${
+        isNew
+          ? 'border-emerald-200 bg-emerald-50/40 hover:bg-emerald-50/60'
+          : 'border-transparent hover:bg-white/60'
+      }`}
+    >
+      <div className="relative w-20 h-20 rounded-xl overflow-hidden bg-stone-100 flex-shrink-0">
+        {listing.thumbnail ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={listing.thumbnail} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-stone-100 to-stone-200" />
+        )}
+        {isNew && (
+          <span className="absolute top-1 left-1 aurora-chip aurora-chip-mint text-[9px] px-1.5 py-0">
+            New
+          </span>
+        )}
+      </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray-900 truncate">{listing.title || listing.adId}</p>
-        <p className="text-xs text-gray-500">{listing.location}</p>
-      </div>
-      <div className="hidden sm:flex items-center gap-3 text-xs text-gray-500">
-        {listing.bedrooms != null && <span>{listing.bedrooms} bd</span>}
-        {listing.bathrooms != null && <span>{listing.bathrooms} ba</span>}
-        {listing.builtAreaSqm != null && <span>{formatArea(listing.builtAreaSqm)}</span>}
-      </div>
-      <div className="text-right">
-        <p className="text-sm font-medium text-gray-900">{listing.price ? formatPrice(listing.price) : '—'}</p>
-        <p className="text-xs text-gray-400">{formatRelativeDate(listing.firstSeenAt)}</p>
+        <p className="font-serif text-lg text-stone-900 leading-tight">
+          {listing.price ? compactPrice(listing.price) : '—'}
+        </p>
+        <p className="text-xs text-stone-700 truncate mt-0.5">{listing.title || listing.adId}</p>
+        <p className="text-[11px] text-stone-500 truncate">{listing.location || '—'}</p>
+        <div className="flex items-center gap-2 mt-1.5 text-[10px] text-stone-500">
+          {listing.bedrooms != null && <span>{listing.bedrooms}bd</span>}
+          {listing.bathrooms != null && <span>{listing.bathrooms}ba</span>}
+          {listing.builtAreaSqm != null && <span>{Math.round(listing.builtAreaSqm)}m²</span>}
+          <span className="ml-auto text-stone-400">{formatRelativeDate(listing.firstSeenAt)}</span>
+        </div>
       </div>
     </Link>
   );
 }
 
-function StatCard({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+function TrendChart({ data, loading }: { data: TrendsData['dailyTrend']; loading: boolean }) {
+  if (loading) {
+    return <div className="h-80 lg:h-full min-h-[20rem] rounded-3xl aurora-surface animate-pulse" />;
+  }
+
+  const total = data.reduce((s, d) => s + d.added, 0);
+  const recent7 = data.slice(-7).reduce((s, d) => s + d.added, 0);
+  const prior7 = data.slice(-14, -7).reduce((s, d) => s + d.added, 0);
+  const wow = prior7 > 0 ? Math.round(((recent7 - prior7) / prior7) * 100) : 0;
+
   return (
-    <div className="bg-white rounded-lg border p-4">
-      <p className="text-sm text-gray-500">{label}</p>
-      <p className={`text-2xl font-bold mt-1 ${accent ? 'text-blue-600' : 'text-gray-900'}`}>{value}</p>
+    <div className="rounded-3xl aurora-surface p-6 h-full flex flex-col">
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <h2 className="font-serif text-2xl text-stone-900">
+            <span className="aurora-rule">Inventory flow</span>
+          </h2>
+          <p className="text-sm text-stone-500 mt-1">New listings discovered over the last 30 days</p>
+        </div>
+        <div className="text-right">
+          <p className="font-serif text-3xl text-stone-900 tabular-nums">{total.toLocaleString()}</p>
+          <p className={`text-xs font-medium mt-0.5 ${wow >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+            {wow >= 0 ? '↑' : '↓'} {Math.abs(wow)}% week over week
+          </p>
+        </div>
+      </div>
+      <div className="flex-1 min-h-[240px]">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+          <defs>
+            <linearGradient id="aurora-added" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={PALETTE.sage} stopOpacity={0.55} />
+              <stop offset="100%" stopColor={PALETTE.sage} stopOpacity={0} />
+            </linearGradient>
+            <linearGradient id="aurora-removed" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={PALETTE.sand} stopOpacity={0.5} />
+              <stop offset="100%" stopColor={PALETTE.sand} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e7e5e4" vertical={false} />
+          <XAxis dataKey="day" tickFormatter={formatDayLabel} stroke="#a8a29e" fontSize={11} tickLine={false} axisLine={false} />
+          <YAxis stroke="#a8a29e" fontSize={11} tickLine={false} axisLine={false} />
+          <Tooltip
+            contentStyle={{ background: 'rgba(255,255,255,0.97)', border: '1px solid #e7e5e4', borderRadius: 12, fontSize: 12 }}
+            labelFormatter={formatDayLabel}
+          />
+          <Area type="monotone" dataKey="removed" stroke={PALETTE.sand} strokeWidth={2} fill="url(#aurora-removed)" />
+          <Area type="monotone" dataKey="added" stroke={PALETTE.sageDeep} strokeWidth={2.5} fill="url(#aurora-added)" />
+        </AreaChart>
+      </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
+function CategoryShare({ data, loading }: { data: TrendsData['categoryShare']; loading: boolean }) {
+  if (loading) {
+    return <div className="h-80 lg:h-full min-h-[20rem] rounded-3xl aurora-surface animate-pulse" />;
+  }
+
+  const COLORS = [PALETTE.sageDeep, PALETTE.sand, PALETTE.slate, PALETTE.sageSoft];
+  const total = data.reduce((s, d) => s + d.active, 0);
+
+  return (
+    <div className="rounded-3xl aurora-surface p-6 h-full flex flex-col">
+      <div>
+        <h2 className="font-serif text-2xl text-stone-900">
+          <span className="aurora-rule">Category mix</span>
+        </h2>
+        <p className="text-sm text-stone-500 mt-1">Active inventory split</p>
+      </div>
+      <div className="flex-1 flex items-center justify-center min-h-[180px] py-3">
+        <ResponsiveContainer width="100%" height="100%" minHeight={180}>
+          <PieChart margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
+            <Pie
+              data={data}
+              dataKey="active"
+              nameKey="category"
+              cx="50%"
+              cy="50%"
+              innerRadius="55%"
+              outerRadius="85%"
+              paddingAngle={3}
+            >
+              {data.map((_, i) => (
+                <Cell key={i} fill={COLORS[i % COLORS.length]} stroke="none" />
+              ))}
+            </Pie>
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="space-y-2">
+        {data.map((d, i) => (
+          <div key={d.category} className="flex items-center justify-between text-sm">
+            <span className="flex items-center gap-2 capitalize text-stone-700">
+              <span className="w-2.5 h-2.5 rounded-full" style={{ background: COLORS[i % COLORS.length] }} />
+              {d.category.replace('_', ' ')}
+            </span>
+            <span className="text-stone-500 tabular-nums">
+              {((d.active / total) * 100).toFixed(0)}%
+              <span className="text-stone-400 ml-2">{d.active.toLocaleString()}</span>
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function FeaturedListings({ listings, loading }: { listings: ListingItem[]; loading: boolean }) {
+  if (loading) {
+    return <div className="h-96 rounded-3xl aurora-surface animate-pulse" />;
+  }
+
+  const featured = listings.slice(0, 5);
+
+  return (
+    <div className="rounded-3xl aurora-surface p-6">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="font-serif text-2xl text-stone-900">
+            <span className="aurora-rule">Newest</span>
+          </h2>
+          <p className="text-xs text-stone-500 mt-1">Across the whole market</p>
+        </div>
+        <Link href="/listings?sort=newest" className="text-sm text-stone-600 hover:text-stone-900 underline-offset-4 hover:underline">
+          See all →
+        </Link>
+      </div>
+      <div className="space-y-2">
+        {featured.map((l) => (
+          <Link
+            key={l.adId}
+            href={`/listings/${l.adId}`}
+            className="group flex gap-3 p-2 rounded-2xl hover:bg-white/60 transition-all"
+          >
+            <div className="relative w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 bg-stone-100">
+              {l.thumbnail ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={l.thumbnail} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-stone-100 to-stone-200" />
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-serif text-base text-stone-900 leading-tight">{compactPrice(l.price)}</p>
+              <p className="text-xs text-stone-700 truncate">{l.title || l.adId}</p>
+              <p className="text-[11px] text-stone-500 truncate">{l.location || '—'}</p>
+              <p className="text-[10px] text-stone-400 mt-0.5">{formatRelativeDate(l.firstSeenAt)}</p>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CityGrid({ cities, loading }: { cities: TrendsData['topCities']; loading: boolean }) {
+  const max = useMemo(() => Math.max(1, ...cities.map((c) => c.active)), [cities]);
+
+  if (loading) {
+    return <div className="h-64 rounded-3xl aurora-surface animate-pulse" />;
+  }
+
+  return (
+    <div className="rounded-3xl aurora-surface p-6">
+      <div className="flex items-center justify-between mb-5">
+        <div>
+          <h2 className="font-serif text-2xl text-stone-900">
+            <span className="aurora-rule">Cities at a glance</span>
+          </h2>
+          <p className="text-sm text-stone-500 mt-1">Where the inventory lives</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {cities.map((c) => {
+          const pct = (c.active / max) * 100;
+          return (
+            <Link
+              key={c.city}
+              href={`/listings?city=${encodeURIComponent(c.city)}`}
+              className="group p-4 rounded-2xl bg-white/55 hover:bg-white border border-stone-200/60 hover:shadow-md transition-all"
+            >
+              <div className="flex items-start justify-between">
+                <p className="font-serif text-lg text-stone-900 group-hover:text-stone-700">{c.city}</p>
+                {c.newThisWeek > 0 && (
+                  <span className="aurora-chip aurora-chip-mint">+{c.newThisWeek}</span>
+                )}
+              </div>
+              <p className="text-2xl font-serif text-stone-900 mt-1.5 tabular-nums">{c.active.toLocaleString()}</p>
+              <p className="text-[11px] text-stone-500 uppercase tracking-wider">active</p>
+              <div className="mt-2.5 h-1 rounded-full bg-stone-100 overflow-hidden">
+                <div
+                  className="h-full transition-all"
+                  style={{
+                    width: `${pct}%`,
+                    background: 'linear-gradient(to right, #6b8e6b, #c9b896)',
+                  }}
+                />
+              </div>
+              <div className="mt-3 flex justify-between text-[11px] text-stone-500">
+                <span>Sale {compactPrice(c.avgSale)}</span>
+                <span>Rent {compactPrice(c.avgRent)}</span>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
     </div>
   );
 }
