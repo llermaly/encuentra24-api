@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { ImageGallery } from './ImageGallery';
 import { PriceHistoryChart } from './PriceHistoryChart';
+import { useQueryClient } from '@tanstack/react-query';
 
 const DetailMap = dynamic(
   () => import('./DetailMap').then(m => ({ default: m.DetailMap })),
@@ -82,6 +83,7 @@ interface ListingDetailProps {
 
 export function ListingDetail({ listing, priceHistory, notes }: ListingDetailProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [isFav, setIsFav] = useState(listing.isFavorite);
   const [stage, setStage] = useState(listing.pipelineStage);
   const [noteText, setNoteText] = useState('');
@@ -99,6 +101,9 @@ export function ListingDetail({ listing, priceHistory, notes }: ListingDetailPro
       });
       setIsFav(true);
     }
+    queryClient.invalidateQueries({ queryKey: ['favorites'] });
+    queryClient.invalidateQueries({ queryKey: ['listings'] });
+    queryClient.invalidateQueries({ queryKey: ['dashboard'] });
   }
 
   async function updateStage(newStage: string) {

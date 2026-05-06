@@ -22,6 +22,8 @@ const navItems: NavItem[] = [
     icon: <Icon d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h4v-7h4v7h4a1 1 0 001-1V10" /> },
   { href: '/listings', label: 'Browse',
     icon: <Icon d="M21 21l-5-5m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /> },
+  { href: '/favorites', label: 'Favorites',
+    icon: <Icon d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /> },
   { href: '/map', label: 'Map',
     icon: <Icon d="M9 20l-5-2.5V5l5 2.5m0 12.5l6-3m-6 3V7.5m6 9.5l5 2.5V8l-5-2.5m0 11.5V5.5" /> },
   { href: '/pipeline', label: 'Pipeline',

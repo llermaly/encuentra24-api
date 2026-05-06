@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { formatPrice, formatArea, formatRelativeDate } from '@/lib/formatters';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useMemo } from 'react';
 
 interface ListingCardProps {
   listing: {
@@ -38,40 +38,17 @@ interface ListingCardProps {
 export function ListingCard({ listing }: ListingCardProps) {
   const queryClient = useQueryClient();
   const [imgIndex, setImgIndex] = useState(0);
-  const [visibleSrc, setVisibleSrc] = useState<string | null>(null);
-  const images = listing.images?.length ? listing.images : [];
+  const images = useMemo(() => listing.images?.length ? listing.images : [], [listing.images]);
   const hasMultiple = images.length > 1;
-  const loadedRef = useRef<Set<string>>(new Set());
   const preloadedRef = useRef(false);
-
-  useEffect(() => {
-    if (images.length > 0) setVisibleSrc(images[0]);
-  }, []);
-
-  useEffect(() => {
-    if (images.length === 0) return;
-    const src = images[imgIndex];
-    if (loadedRef.current.has(src)) {
-      setVisibleSrc(src);
-    } else {
-      const img = new Image();
-      img.onload = () => {
-        loadedRef.current.add(src);
-        setVisibleSrc(src);
-      };
-      img.src = src;
-    }
-  }, [imgIndex, images]);
+  const visibleSrc = images[imgIndex] ?? images[0] ?? null;
 
   const preloadAll = useCallback(() => {
     if (preloadedRef.current || images.length <= 1) return;
     preloadedRef.current = true;
     images.forEach(src => {
-      if (!loadedRef.current.has(src)) {
-        const img = new Image();
-        img.onload = () => loadedRef.current.add(src);
-        img.src = src;
-      }
+      const img = new Image();
+      img.src = src;
     });
   }, [images]);
 
@@ -89,6 +66,8 @@ export function ListingCard({ listing }: ListingCardProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['listings'] });
+      queryClient.invalidateQueries({ queryKey: ['favorites'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 
