@@ -30,6 +30,8 @@ const navItems: NavItem[] = [
     icon: <Icon d="M4 6h16M4 12h10M4 18h6" /> },
   { href: '/saved-searches', label: 'Saved Searches',
     icon: <Icon d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-4-7 4V5z" /> },
+  { href: '/notifications/daily-summary', label: 'Notifications',
+    icon: <Icon d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8m-18 8h18a2 2 0 002-2V6a2 2 0 00-2-2H3a2 2 0 00-2 2v8a2 2 0 002 2z" /> },
   { href: '/agents', label: 'Agents',
     icon: <Icon d="M17 20h5v-2a3 3 0 00-5.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M16 7a4 4 0 11-8 0 4 4 0 018 0z" /> },
   { href: '/crawl-history', label: 'Crawl History',

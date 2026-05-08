@@ -118,23 +118,28 @@ export default function SavedSearchesPage() {
   return (
     <div className="px-6 md:px-10 py-8 max-w-[1300px] mx-auto">
       {/* Hero */}
-      <div className="mb-8">
-        <p className="text-[11px] uppercase tracking-[0.3em] text-stone-500 font-medium">Watching</p>
-        <h1 className="font-serif text-4xl md:text-5xl font-light tracking-tight text-stone-900 mt-1.5">
-          Saved <span className="italic">searches</span>
-        </h1>
-        <p className="text-sm text-stone-500 mt-2">
-          {isLoading ? 'Loading…' : searches.length === 0
-            ? 'Save filters from the browse page to follow new matches.'
-            : (
-              <>
-                {searches.length} active {searches.length === 1 ? 'search' : 'searches'}
-                {totalNew > 0 && (
-                  <span className="ml-2 aurora-chip aurora-chip-mint">+{totalNew} new since last check</span>
-                )}
-              </>
-            )}
-        </p>
+      <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.3em] text-stone-500 font-medium">Watching</p>
+          <h1 className="font-serif text-4xl md:text-5xl font-light tracking-tight text-stone-900 mt-1.5">
+            Saved <span className="italic">searches</span>
+          </h1>
+          <p className="text-sm text-stone-500 mt-2">
+            {isLoading ? 'Loading…' : searches.length === 0
+              ? 'Save filters from the browse page to follow new matches.'
+              : (
+                <>
+                  {searches.length} active {searches.length === 1 ? 'search' : 'searches'}
+                  {totalNew > 0 && (
+                    <span className="ml-2 aurora-chip aurora-chip-mint">+{totalNew} new since last check</span>
+                  )}
+                </>
+              )}
+          </p>
+        </div>
+        <Link href="/notifications/daily-summary" className="aurora-pill aurora-pill-ghost">
+          Preview notifications →
+        </Link>
       </div>
 
       {isLoading ? (
