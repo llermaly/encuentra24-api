@@ -10,6 +10,7 @@ export const crawlCommand = new Command('crawl')
   .option('-p, --max-pages <number>', 'Max pages per category', '5')
   .option('--full', 'Full crawl (up to 500 pages per category)', false)
   .option('--detail-only', 'Only crawl detail pages for listings missing detail data', false)
+  .option('--skip-details', 'Only crawl list pages; leave new listings for a later detail-only crawl', false)
   .option('--log-level <level>', 'Log level: debug, info, warn, error', 'info')
   .action(async (opts) => {
     console.log('Starting crawl...');
@@ -18,6 +19,7 @@ export const crawlCommand = new Command('crawl')
     console.log(`  Region: ${opts.region || 'all'}`);
     console.log(`  Max pages: ${opts.full ? 'unlimited (full)' : opts.maxPages}`);
     console.log(`  Detail only: ${opts.detailOnly}`);
+    console.log(`  Crawl details: ${!opts.skipDetails}`);
     console.log('');
 
     try {
@@ -28,6 +30,7 @@ export const crawlCommand = new Command('crawl')
         maxPages: parseInt(opts.maxPages, 10),
         full: opts.full,
         detailOnly: opts.detailOnly,
+        crawlDetails: !opts.skipDetails,
         logLevel: opts.logLevel,
       });
       console.log('\nCrawl completed successfully.');

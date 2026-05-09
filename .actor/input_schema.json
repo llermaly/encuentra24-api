@@ -1,0 +1,77 @@
+{
+  "title": "Encuentra24 crawler input",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+    "mode": {
+      "title": "Mode",
+      "type": "string",
+      "description": "Crawl mode to run.",
+      "enum": ["incremental", "full", "detail-only"],
+      "default": "incremental",
+      "editor": "select"
+    },
+    "category": {
+      "title": "Category",
+      "type": "string",
+      "description": "Optional listing category filter: sale, rental, vacation, or new_project.",
+      "editor": "textfield"
+    },
+    "subcategory": {
+      "title": "Subcategory",
+      "type": "string",
+      "description": "Optional listing subcategory filter, such as apartamentos or casas.",
+      "editor": "textfield"
+    },
+    "regionSlug": {
+      "title": "Region slug",
+      "type": "string",
+      "description": "Optional Encuentra24 region slug.",
+      "editor": "textfield"
+    },
+    "maxPages": {
+      "title": "Max pages",
+      "type": "integer",
+      "description": "Max pages per category for incremental or scoped test runs. Full mode ignores this and crawls all discovered pages.",
+      "minimum": 1,
+      "maximum": 9999,
+      "default": 5,
+      "editor": "number"
+    },
+    "crawlDetails": {
+      "title": "Crawl details",
+      "type": "boolean",
+      "description": "When false, crawl only listing result pages and leave details for a later detail-only run.",
+      "default": true,
+      "editor": "checkbox"
+    },
+    "syncDataset": {
+      "title": "Sync dataset",
+      "type": "boolean",
+      "description": "When true, listing insert/update events written to Postgres are also pushed to the Crawlee dataset. The actor defaults to true for incremental runs and false for full/detail-only runs when this field is omitted.",
+      "default": false,
+      "editor": "checkbox"
+    },
+    "logLevel": {
+      "title": "Log level",
+      "type": "string",
+      "enum": ["debug", "info", "warn", "error"],
+      "default": "info",
+      "editor": "select"
+    },
+    "jobName": {
+      "title": "Job name",
+      "type": "string",
+      "description": "Human-readable job label shown in actor outputs.",
+      "default": "encuentra24-crawl",
+      "editor": "textfield"
+    },
+    "metadata": {
+      "title": "Metadata",
+      "type": "object",
+      "description": "Free-form run metadata for dashboard/debug context.",
+      "default": {},
+      "editor": "json"
+    }
+  }
+}

@@ -1,0 +1,14 @@
+node_modules
+web/node_modules
+web/.next
+dist
+data
+storage
+tmp
+.env
+.env.*
+.git
+.gitignore
+npm-debug.log*
+Dockerfile
+docker-compose*.yml

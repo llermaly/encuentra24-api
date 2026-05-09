@@ -1,0 +1,22 @@
+name: encuentra24-local-crawler
+
+services:
+  postgres:
+    image: postgres:18.3-alpine
+    container_name: encuentra24-local-postgres
+    environment:
+      POSTGRES_DB: encuentra24
+      POSTGRES_USER: encuentra24
+      POSTGRES_PASSWORD: encuentra24
+    ports:
+      - "55433:5432"
+    volumes:
+      - encuentra24_local_postgres:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U encuentra24 -d encuentra24"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  encuentra24_local_postgres:

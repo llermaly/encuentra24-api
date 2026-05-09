@@ -1,11 +1,18 @@
 import { createCheerioRouter, log } from 'crawlee';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { getDb } from '../db/connection.js';
-import { listings, priceHistory, crawlErrors, crawlSeenListings } from '../db/schema.js';
+import { listings, priceHistory, crawlSeenListings } from '../db/schema.js';
+import { config } from '../config.js';
 import { extractListingCards, extractGa4Data, extractPagination, extractResultsCount, mergeGa4DataIntoCards } from './extractors/list-page.js';
 import { extractDetailData } from './extractors/detail-page.js';
 import { buildListUrl, findCategory, type CategoryConfig } from './categories.js';
 import { isRealEstateUrl, matchesCategorySlug } from './utils/url.js';
+import { addPageMetrics, incrementCrawlMetric } from './metrics.js';
+import {
+  buildListingDatasetEvent,
+  pushListingDatasetEvents,
+  type ListingDatasetEvent,
+} from './dataset-sync.js';
 
 export const router = createCheerioRouter();
 
@@ -19,6 +26,8 @@ router.addHandler('LIST', async ({ $, request, enqueueLinks, crawler }) => {
     maxPages: number;
     crawlRunId: number;
     trackSeen?: boolean;
+    crawlDetails?: boolean;
+    syncDataset?: boolean;
   };
 
   const currentPage = (request.userData.page as number) || 1;
@@ -54,6 +63,7 @@ router.addHandler('LIST', async ({ $, request, enqueueLinks, crawler }) => {
   let updatedCount = 0;
   let unchangedCount = 0;
   let skippedCount = 0;
+  const validCards: typeof cards = [];
   const seenValues: (typeof crawlSeenListings.$inferInsert)[] = [];
 
   for (const card of cards) {
@@ -67,6 +77,8 @@ router.addHandler('LIST', async ({ $, request, enqueueLinks, crawler }) => {
       continue;
     }
 
+    validCards.push(card);
+
     if (request.userData.trackSeen) {
       seenValues.push({
         crawlRunId,
@@ -74,17 +86,30 @@ router.addHandler('LIST', async ({ $, request, enqueueLinks, crawler }) => {
         seenAt: now,
       });
     }
+  }
 
-    // Check if listing already exists
-    const existing = await db
-      .select({ adId: listings.adId, price: listings.price, removedAt: listings.removedAt })
+  const existingRows = validCards.length === 0
+    ? []
+    : await db
+      .select({
+        adId: listings.adId,
+        price: listings.price,
+        removedAt: listings.removedAt,
+        detailCrawled: listings.detailCrawled,
+      })
       .from(listings)
-      .where(eq(listings.adId, card.adId))
-      .then(r => r[0]);
+      .where(inArray(listings.adId, validCards.map((card) => card.adId)));
 
+  const existingByAdId = new Map(existingRows.map((row) => [row.adId, row]));
+  const newListingValues: (typeof listings.$inferInsert)[] = [];
+  const priceHistoryValues: (typeof priceHistory.$inferInsert)[] = [];
+  const detailRequests: { url: string; label: 'DETAIL'; userData: { adId: string; crawlRunId: number; syncDataset?: boolean } }[] = [];
+  const datasetEvents: ListingDatasetEvent[] = [];
+
+  for (const card of validCards) {
+    const existing = existingByAdId.get(card.adId);
     if (!existing) {
-      // New listing — insert
-      await db.insert(listings).values({
+      newListingValues.push({
         adId: card.adId,
         slug: card.slug,
         url: card.url,
@@ -109,7 +134,72 @@ router.addHandler('LIST', async ({ $, request, enqueueLinks, crawler }) => {
         updatedAt: now,
         detailCrawled: false,
       });
+      datasetEvents.push(buildListingDatasetEvent({
+        eventType: 'listing.card.inserted',
+        crawlRunId,
+        adId: card.adId,
+        url: card.url,
+        occurredAt: now,
+        postgres: {
+          table: 'listings',
+          operation: 'insert',
+          fields: [
+            'adId',
+            'slug',
+            'url',
+            'category',
+            'subcategory',
+            'title',
+            'price',
+            'location',
+            'bedrooms',
+            'bathrooms',
+            'parking',
+            'builtAreaSqm',
+            'sellerName',
+            'sellerVerified',
+            'featureLevel',
+            'favoritesCount',
+            'images',
+            'imageCount',
+            'regionSlug',
+            'firstSeenAt',
+            'lastSeenAt',
+            'updatedAt',
+            'detailCrawled',
+          ],
+        },
+        listing: {
+          adId: card.adId,
+          slug: card.slug,
+          url: card.url,
+          category: categoryConfig.category,
+          subcategory: categoryConfig.subcategory,
+          title: card.title,
+          price: card.price,
+          location: card.location,
+          bedrooms: card.bedrooms,
+          bathrooms: card.bathrooms,
+          parking: card.parking,
+          builtAreaSqm: card.areaSqm,
+          sellerName: card.sellerName,
+          sellerVerified: card.sellerVerified,
+          featureLevel: card.featureLevel,
+          favoritesCount: card.favoritesCount,
+          imageUrl: card.imageUrl,
+          regionSlug: regionSlug || null,
+          detailCrawled: false,
+          firstSeenAt: now,
+          lastSeenAt: now,
+          updatedAt: now,
+        },
+      }));
       newCount++;
+      detailRequests.push({
+        url: card.url,
+        label: 'DETAIL',
+        userData: { adId: card.adId, crawlRunId, syncDataset: request.userData.syncDataset },
+      });
     } else {
       // Existing listing — check for price change
       // Use rounding to avoid float noise (e.g. 199743680 vs 199743682)
@@ -117,8 +207,7 @@ router.addHandler('LIST', async ({ $, request, enqueueLinks, crawler }) => {
         && Math.round(card.price) !== Math.round(existing.price);
 
       if (priceChanged) {
-        // Record the OLD price in history before updating
-        await db.insert(priceHistory).values({
+        priceHistoryValues.push({
           adId: card.adId,
           price: existing.price!,
           currency: 'USD',
@@ -137,20 +226,98 @@ router.addHandler('LIST', async ({ $, request, enqueueLinks, crawler }) => {
             detailCrawled: false, // re-crawl detail on price change
           })
           .where(eq(listings.adId, card.adId));
+        datasetEvents.push(buildListingDatasetEvent({
+          eventType: 'listing.price.updated',
+          crawlRunId,
+          adId: card.adId,
+          url: card.url,
+          occurredAt: now,
+          postgres: {
+            table: 'listings',
+            operation: 'update',
+            fields: ['oldPrice', 'price', 'lastSeenAt', 'updatedAt', 'removedAt', 'detailCrawled'],
+          },
+          listing: {
+            adId: card.adId,
+            url: card.url,
+            category: categoryConfig.category,
+            subcategory: categoryConfig.subcategory,
+            title: card.title,
+            price: card.price,
+            oldPrice: existing.price,
+            detailCrawled: false,
+            lastSeenAt: now,
+            updatedAt: now,
+          },
+          changes: {
+            price: { from: existing.price, to: card.price },
+            detailCrawled: { to: false },
+            removedAt: { to: null },
+          },
+        }));
         updatedCount++;
+        detailRequests.push({
+          url: card.url,
+          label: 'DETAIL',
+          userData: { adId: card.adId, crawlRunId, syncDataset: request.userData.syncDataset },
+        });
       } else {
         if (existing.removedAt !== null) {
           // Listing reappeared after being marked removed.
           await db.update(listings)
             .set({ lastSeenAt: now, removedAt: null, updatedAt: now })
             .where(eq(listings.adId, card.adId));
+          datasetEvents.push(buildListingDatasetEvent({
+            eventType: 'listing.reappeared',
+            crawlRunId,
+            adId: card.adId,
+            url: card.url,
+            occurredAt: now,
+            postgres: {
+              table: 'listings',
+              operation: 'update',
+              fields: ['lastSeenAt', 'removedAt', 'updatedAt'],
+            },
+            listing: {
+              adId: card.adId,
+              url: card.url,
+              category: categoryConfig.category,
+              subcategory: categoryConfig.subcategory,
+              title: card.title,
+              price: card.price,
+              lastSeenAt: now,
+              updatedAt: now,
+              removedAt: null,
+            },
+            changes: {
+              removedAt: { from: existing.removedAt, to: null },
+            },
+          }));
           updatedCount++;
         } else {
           // Same price and still active: skip the listing row write.
           unchangedCount++;
         }
+
+        if (!existing.detailCrawled) {
+          detailRequests.push({
+            url: card.url,
+            label: 'DETAIL',
+            userData: { adId: card.adId, crawlRunId, syncDataset: request.userData.syncDataset },
+          });
+        }
       }
     }
+  }
+
+  if (newListingValues.length > 0) {
+    await db.insert(listings)
+      .values(newListingValues)
+      .onConflictDoNothing();
+  }
+
+  if (priceHistoryValues.length > 0) {
+    await db.insert(priceHistory).values(priceHistoryValues);
   }
 
   if (seenValues.length > 0) {
@@ -159,40 +326,19 @@ router.addHandler('LIST', async ({ $, request, enqueueLinks, crawler }) => {
       .onConflictDoNothing();
   }
 
+  await pushListingDatasetEvents(request.userData.syncDataset, datasetEvents);
+
+  addPageMetrics(crawlRunId, {
+    listingsFound: cards.length - skippedCount,
+    listingsNew: newCount,
+    listingsUpdated: updatedCount,
+    listingsSkipped: skippedCount,
+  });
+
   log.info(`Page ${currentPage}: ${newCount} new, ${updatedCount} updated, ${unchangedCount} unchanged, ${skippedCount} skipped`);
 
-  // Update crawl run stats
-  await db.update(crawlErrors); // no-op, just to ensure table exists
-  // We'll update crawl_runs stats in the main orchestrator
-
-  // Enqueue detail pages for new/price-changed listings
-  const detailUrls = cards
-    .filter((card) => {
-      // Only enqueue if we just inserted or price changed
-      return true; // The detail-only filter happens in the DETAIL handler via detailCrawled flag
-    })
-    .map((card) => ({
-      url: card.url,
-      label: 'DETAIL',
-      userData: { adId: card.adId, crawlRunId },
-    }));
-
-  // Actually, we should only enqueue details for listings where detailCrawled is false
-  // Query DB for these
-  for (const card of cards) {
-    const listing = await db
-      .select({ detailCrawled: listings.detailCrawled })
-      .from(listings)
-      .where(eq(listings.adId, card.adId))
-      .then(r => r[0]);
-
-    if (listing && !listing.detailCrawled) {
-      await crawler.addRequests([{
-        url: card.url,
-        label: 'DETAIL',
-        userData: { adId: card.adId, crawlRunId },
-      }]);
-    }
+  if (request.userData.crawlDetails !== false && detailRequests.length > 0) {
+    await crawler.addRequests(detailRequests);
   }
 
   // Enqueue next page if within limits
@@ -202,7 +348,7 @@ router.addHandler('LIST', async ({ $, request, enqueueLinks, crawler }) => {
   // Use results count as fallback for total pages (guards against truncated pagination UI)
   const resultsCount = extractResultsCount($);
   if (resultsCount !== null && resultsCount > 0) {
-    const totalPages = Math.ceil(resultsCount / 30);
+    const totalPages = Math.ceil(resultsCount / config.crawler.listingsPerPage);
     maxPage = Math.max(maxPage, totalPages);
   }
 
@@ -220,6 +366,8 @@ router.addHandler('LIST', async ({ $, request, enqueueLinks, crawler }) => {
         crawlRunId,
         page: nextPage,
         trackSeen: request.userData.trackSeen,
+        crawlDetails: request.userData.crawlDetails,
+        syncDataset: request.userData.syncDataset,
       },
     }]);
   }
@@ -232,6 +380,7 @@ router.addHandler('DETAIL', async ({ $, request }) => {
   const { adId, crawlRunId } = request.userData as {
     adId: string;
     crawlRunId: number;
+    syncDataset?: boolean;
   };
 
   log.info(`DETAIL page for ad ${adId}`, { url: request.url });
@@ -271,6 +420,35 @@ router.addHandler('DETAIL', async ({ $, request }) => {
     await db.update(listings)
       .set({ removedAt: now, removalCheckedAt: now, updatedAt: now, detailCrawled: true })
       .where(eq(listings.adId, adId));
+    await pushListingDatasetEvents(request.userData.syncDataset, [
+      buildListingDatasetEvent({
+        eventType: 'listing.removed',
+        crawlRunId,
+        adId,
+        url: existingListing?.url ?? request.url,
+        occurredAt: now,
+        postgres: {
+          table: 'listings',
+          operation: 'update',
+          fields: ['removedAt', 'removalCheckedAt', 'updatedAt', 'detailCrawled'],
+        },
+        listing: {
+          adId,
+          url: existingListing?.url ?? request.url,
+          category: existingListing?.category,
+          subcategory: existingListing?.subcategory,
+          removedAt: now,
+          removalCheckedAt: now,
+          updatedAt: now,
+          detailCrawled: true,
+        },
+        changes: {
+          removedAt: { to: now },
+          detailCrawled: { to: true },
+        },
+      }),
+    ]);
+    incrementCrawlMetric(crawlRunId, 'detailsRemoved');
     return;
   }
 
@@ -283,6 +461,33 @@ router.addHandler('DETAIL', async ({ $, request }) => {
     await db.update(listings)
       .set({ removedAt: now, removalCheckedAt: now, updatedAt: now })
       .where(eq(listings.adId, adId));
+    await pushListingDatasetEvents(request.userData.syncDataset, [
+      buildListingDatasetEvent({
+        eventType: 'listing.removed',
+        crawlRunId,
+        adId,
+        url: existingListing?.url ?? request.url,
+        occurredAt: now,
+        postgres: {
+          table: 'listings',
+          operation: 'update',
+          fields: ['removedAt', 'removalCheckedAt', 'updatedAt'],
+        },
+        listing: {
+          adId,
+          url: existingListing?.url ?? request.url,
+          category: existingListing?.category,
+          subcategory: existingListing?.subcategory,
+          removedAt: now,
+          removalCheckedAt: now,
+          updatedAt: now,
+        },
+        changes: {
+          removedAt: { to: now },
+        },
+      }),
+    ]);
+    incrementCrawlMetric(crawlRunId, 'detailsRemoved');
     return;
   }
 
@@ -374,5 +579,34 @@ router.addHandler('DETAIL', async ({ $, request }) => {
     .set(updates)
     .where(eq(listings.adId, adId));
 
+  await pushListingDatasetEvents(request.userData.syncDataset, [
+    buildListingDatasetEvent({
+      eventType: 'listing.detail.updated',
+      crawlRunId,
+      adId,
+      url: existingListing?.url ?? request.url,
+      occurredAt: now,
+      postgres: {
+        table: 'listings',
+        operation: 'update',
+        fields: Object.keys(updates),
+      },
+      listing: {
+        adId,
+        url: existingListing?.url ?? request.url,
+        category: existingListing?.category,
+        subcategory: existingListing?.subcategory,
+        ...updates,
+        rawJsonLd: undefined,
+        rawLoopaData: undefined,
+        rawRetailRocket: undefined,
+        hasRawJsonLd: Boolean(updates.rawJsonLd),
+        hasRawLoopaData: Boolean(updates.rawLoopaData),
+        hasRawRetailRocket: Boolean(updates.rawRetailRocket),
+      },
+    }),
+  ]);
+
+  incrementCrawlMetric(crawlRunId, 'detailsCrawled');
   log.info(`Updated detail for ad ${adId}: ${detail.bedrooms}bd/${detail.bathrooms}ba, ${detail.builtAreaSqm}m², ${detail.images.length} images`);
 });

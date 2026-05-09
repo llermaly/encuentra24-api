@@ -1,0 +1,8 @@
+{
+  "actorSpecification": 1,
+  "name": "encuentra24",
+  "title": "Encuentra24 Panama Real Estate Crawler",
+  "description": "Crawls Encuentra24 Panama real estate categories into the Encuentra24 PostgreSQL schema.",
+  "version": "0.1.0",
+  "input": "./input_schema.json"
+}

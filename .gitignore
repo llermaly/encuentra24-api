@@ -3,6 +3,8 @@ dist/
 data/
 storage/
 .env
+.actor/env.local
+.playwright-mcp/
 *.db
 *.db-journal
 *.db-wal
