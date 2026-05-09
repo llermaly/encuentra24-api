@@ -44,14 +44,15 @@ Crawlee migration database:
 - Smoke: actor-style incremental `new_project/proyectos-nuevos` run `1390` completed with 1 page, 4 listings found, 0 errors.
 
 Crawlee Cloud platform:
-- Name: `encuentra24-crawlee-cloud`
-- UUID: `bdvayjem0bz9pes8fmt5rc19`
+- Name: `encuentra24-crawlee-cloud-v7`
+- UUID: `k1412w9ab9i503k0rwbqy0wt`
 - Type: custom Docker Compose service
-- Domains: `https://crawlee.llermaly.com`, `https://crawlee-dashboard.llermaly.com`
-- Components: API, dashboard, runner, scheduler, Postgres, Redis, MinIO
+- Domains: `https://crawlee-api.llermaly.com`, `https://crawlee-dashboard.llermaly.com`
+- Components: API, dashboard, runner, scheduler, Redis, MinIO, DIND runner sidecar, per-domain Caddy proxies
 - Source: `crawlee-cloud/crawlee-cloud` pinned to commit `8b40c8d8371a431cbcfe785c632091981bbc5328`
-- Status as of 2026-05-09: stopped. Initial start made the Coolify panel/API intermittently unavailable; service was stopped and the panel recovered.
-- Notes: upstream API enables PostgreSQL SSL automatically when `NODE_ENV=production`, which fails against the bundled local Postgres. The stopped service definition uses a startup command workaround for the API migration/start path and patches the runner container at runtime to skip its broad Docker cleanup calls. Do not restart without a controlled maintenance window and live monitoring.
+- Metadata database: standalone Coolify PostgreSQL `encuentra24-crawlee-cloud-meta-db`, UUID `v13hj3ssbb6ojmzbujcfd1q5`, public port `54324`, database/user `crawlee_cloud_meta`.
+- Status as of 2026-05-09: service is deployed but API is crash-looping while pointed at the metadata DB; next diagnostic requires container logs or exec on the Coolify host. Earlier service attempts `bdvayjem0bz9pes8fmt5rc19`, `z11hebgjgt12pbn26u27z9vu`, `u12y14jz95pba64694y77t5j`, `njwtypqfy1lfos10ondf7hlm`, `k5ofv63q2tqobiz1nxefntqa`, and `xm37l34wxv5qzce01w507w4o` are stopped/no-domain.
+- Notes: runner is isolated through Docker-in-Docker and does not mount the host Docker socket. Public routing uses `api-proxy` and `dashboard-proxy` Caddy sidecars because direct Coolify routes to the API service hung.
 
 Vercel project:
 - Name: `encuentra24-api`

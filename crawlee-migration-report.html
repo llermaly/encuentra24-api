@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Crawlee Migration Risk Report — encuentra24-api</title>
+<style>
+  :root {
+    --bg: #fafaf7;
+    --surface: #ffffff;
+    --ink: #18181b;
+    --ink-2: #3f3f46;
+    --ink-3: #71717a;
+    --line: #e4e4e7;
+    --line-2: #d4d4d8;
+    --code-bg: #f4f4f5;
+    --code-ink: #18181b;
+
+    --green: #15803d;
+    --green-bg: #dcfce7;
+    --green-line: #86efac;
+
+    --amber: #b45309;
+    --amber-bg: #fef3c7;
+    --amber-line: #fcd34d;
+
+    --red: #b91c1c;
+    --red-bg: #fee2e2;
+    --red-line: #fca5a5;
+
+    --blue: #1d4ed8;
+    --blue-bg: #dbeafe;
+    --blue-line: #93c5fd;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 56px 32px 96px;
+  }
+
+  /* Header */
+  header.report-head {
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 24px;
+    margin-bottom: 40px;
+  }
+  header.report-head .eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-size: 12px;
+    color: var(--ink-3);
+    font-weight: 600;
+  }
+  header.report-head h1 {
+    font-size: 36px;
+    line-height: 1.15;
+    margin: 8px 0 12px;
+    letter-spacing: -0.02em;
+  }
+  header.report-head .meta {
+    color: var(--ink-3);
+    font-size: 14px;
+  }
+  header.report-head .meta code {
+    background: var(--code-bg);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 13px;
+  }
+
+  /* Verdict banner */
+  .verdict {
+    background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 100%);
+    border: 1px solid var(--green-line);
+    border-radius: 12px;
+    padding: 24px 28px;
+    margin: 32px 0 40px;
+  }
+  .verdict h2 {
+    margin: 0 0 8px;
+    font-size: 20px;
+    color: var(--green);
+  }
+  .verdict p {
+    margin: 0;
+    color: var(--ink-2);
+  }
+
+  /* Scoreboard */
+  .scoreboard {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin: 32px 0 48px;
+  }
+  .score {
+    border: 1px solid var(--line);
+    background: var(--surface);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .score .num {
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 6px;
+    letter-spacing: -0.02em;
+  }
+  .score .label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-3);
+    font-weight: 600;
+  }
+  .score.red .num { color: var(--red); }
+  .score.amber .num { color: var(--amber); }
+  .score.green .num { color: var(--green); }
+  .score.blue .num { color: var(--blue); }
+
+  /* TOC */
+  nav.toc {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin-bottom: 48px;
+  }
+  nav.toc h3 {
+    margin: 0 0 12px;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-3);
+    font-weight: 600;
+  }
+  nav.toc ol {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    counter-reset: section;
+  }
+  nav.toc ol li {
+    counter-increment: section;
+    margin: 6px 0;
+  }
+  nav.toc ol li::before {
+    content: counter(section) ".";
+    color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
+    margin-right: 8px;
+    font-weight: 600;
+  }
+  nav.toc a {
+    color: var(--ink);
+    text-decoration: none;
+    border-bottom: 1px dotted var(--line-2);
+  }
+  nav.toc a:hover {
+    color: var(--blue);
+    border-bottom-color: var(--blue);
+  }
+
+  /* Section headers */
+  section { margin-bottom: 56px; }
+  section > h2 {
+    font-size: 24px;
+    margin: 0 0 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--ink);
+    letter-spacing: -0.01em;
+  }
+
+  /* Findings */
+  .finding {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left-width: 4px;
+    border-radius: 8px;
+    padding: 20px 24px;
+    margin-bottom: 16px;
+  }
+  .finding.green { border-left-color: var(--green); }
+  .finding.amber { border-left-color: var(--amber); }
+  .finding.red   { border-left-color: var(--red); }
+  .finding.blue  { border-left-color: var(--blue); }
+
+  .finding header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+  }
+  .finding header h3 {
+    margin: 0;
+    font-size: 17px;
+    line-height: 1.3;
+    flex: 1;
+    min-width: 0;
+  }
+  .badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 3px 8px;
+    border-radius: 999px;
+    border: 1px solid;
+    white-space: nowrap;
+  }
+  .badge.green { color: var(--green); background: var(--green-bg); border-color: var(--green-line); }
+  .badge.amber { color: var(--amber); background: var(--amber-bg); border-color: var(--amber-line); }
+  .badge.red   { color: var(--red);   background: var(--red-bg);   border-color: var(--red-line); }
+  .badge.blue  { color: var(--blue);  background: var(--blue-bg);  border-color: var(--blue-line); }
+
+  .finding p { margin: 8px 0; color: var(--ink-2); }
+  .finding p:first-of-type { margin-top: 0; }
+  .finding p:last-of-type { margin-bottom: 0; }
+
+  .finding ul {
+    margin: 8px 0;
+    padding-left: 22px;
+    color: var(--ink-2);
+  }
+  .finding ul li { margin: 4px 0; }
+
+  code, .filepath {
+    font-family: "SF Mono", "Menlo", "Monaco", "Consolas", monospace;
+    font-size: 13.5px;
+  }
+  p code, li code, td code {
+    background: var(--code-bg);
+    padding: 1px 6px;
+    border-radius: 4px;
+    color: var(--code-ink);
+  }
+  .filepath {
+    color: var(--blue);
+    background: var(--blue-bg);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 12.5px;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 12px 14px;
+    overflow-x: auto;
+    margin: 12px 0;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  pre code {
+    background: transparent;
+    padding: 0;
+  }
+
+  /* Comparison block */
+  .compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 12px 0;
+  }
+  .compare > div {
+    background: var(--code-bg);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 12px 14px;
+    font-size: 13px;
+  }
+  .compare .label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-3);
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .compare pre {
+    margin: 0;
+    background: transparent;
+    border: 0;
+    padding: 0;
+  }
+
+  /* Callout */
+  .callout {
+    background: var(--blue-bg);
+    border: 1px solid var(--blue-line);
+    border-left-width: 4px;
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin: 12px 0;
+    color: var(--ink);
+  }
+  .callout strong { color: var(--blue); }
+
+  /* Checklist */
+  .checklist {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 24px 28px;
+  }
+  .checklist h3 {
+    margin: 0 0 16px;
+    font-size: 18px;
+  }
+  .checklist ol {
+    margin: 0;
+    padding-left: 0;
+    list-style: none;
+    counter-reset: check;
+  }
+  .checklist ol li {
+    counter-increment: check;
+    padding-left: 36px;
+    position: relative;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 14px;
+  }
+  .checklist ol li:last-child {
+    border-bottom: 0;
+    margin-bottom: 0;
+    padding-bottom: 0;
+  }
+  .checklist ol li::before {
+    content: counter(check);
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--ink);
+    color: var(--surface);
+    text-align: center;
+    line-height: 26px;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .checklist ol li strong { display: block; margin-bottom: 4px; }
+  .checklist ol li p { margin: 0; color: var(--ink-2); font-size: 14.5px; }
+
+  footer.report-foot {
+    margin-top: 64px;
+    padding-top: 24px;
+    border-top: 1px solid var(--line);
+    color: var(--ink-3);
+    font-size: 13px;
+  }
+
+  /* Anchor scroll */
+  section, .finding { scroll-margin-top: 24px; }
+
+  @media print {
+    body { background: white; }
+    .finding, nav.toc, .verdict, .checklist, .score { box-shadow: none; }
+    a { color: inherit; text-decoration: none; }
+  }
+
+  @media (max-width: 720px) {
+    .wrap { padding: 32px 20px 64px; }
+    header.report-head h1 { font-size: 28px; }
+    .scoreboard { grid-template-columns: repeat(2, 1fr); }
+    .compare { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="report-head">
+  <div class="eyebrow">Code Review</div>
+  <h1>Crawlee migration — risk &amp; bug report</h1>
+  <div class="meta">
+    Repository: <code>encuentra24-api</code> &nbsp;·&nbsp;
+    Branch: <code>main</code> (uncommitted changes) &nbsp;·&nbsp;
+    Type-check: <code>npx tsc --noEmit</code> passes
+  </div>
+</header>
+
+<div class="verdict">
+  <h2>Bottom line: the core crawl logic is safe to ship</h2>
+  <p>Every branch of the LIST handler (new / price-changed / resurrected / unchanged) was traced against the old code and is functionally equivalent or better. Removed-listing detection, the safety check, and database writes are preserved. The risks live in the <em>deployment surface</em> — migrations folder, Apify Actor, dataset sync — not in the crawler itself.</p>
+</div>
+
+<div class="scoreboard">
+  <div class="score red">
+    <div class="num">2</div>
+    <div class="label">Higher-risk</div>
+  </div>
+  <div class="score amber">
+    <div class="num">5</div>
+    <div class="label">Worth watching</div>
+  </div>
+  <div class="score green">
+    <div class="num">7</div>
+    <div class="label">Equivalent or improved</div>
+  </div>
+  <div class="score blue">
+    <div class="num">5</div>
+    <div class="label">Pre-cutover checks</div>
+  </div>
+</div>
+
+<nav class="toc">
+  <h3>Contents</h3>
+  <ol>
+    <li><a href="#section-behavior">Behavior changes vs. the old crawler</a></li>
+    <li><a href="#section-risks">Higher-risk concerns</a></li>
+    <li><a href="#section-small">Smaller findings</a></li>
+    <li><a href="#section-checklist">What to verify before cutting over</a></li>
+  </ol>
+</nav>
+
+<!-- ============================================================ -->
+<section id="section-behavior">
+  <h2>1. Behavior changes vs. the old crawler</h2>
+
+  <div class="finding green">
+    <header>
+      <span class="badge green">Improved</span>
+      <h3>1a. List handler is faster but semantically equivalent</h3>
+    </header>
+    <p>The old code's per-card N+1 query pattern was replaced with one batched <code>inArray()</code> lookup, batched inserts, and a single <code>addRequests()</code> call.</p>
+    <p>I traced every branch (new, price-changed, resurrected, unchanged) and confirmed the detail-enqueue rule from the old code (<code>!detailCrawled</code>) is preserved exactly in the new code.</p>
+    <p><strong>Net:</strong> fewer round-trips, same outcome.</p>
+  </div>
+
+  <div class="finding green">
+    <header>
+      <span class="badge green">Improved</span>
+      <h3>1b. New inserts now use <code>onConflictDoNothing()</code></h3>
+    </header>
+    <p>The old code would crash on a unique-constraint violation when two crawl runs raced on the same <code>adId</code>. The new code silently skips the duplicate.</p>
+    <p>The downside is that if the conflicting card has fresh data (e.g. updated price), the in-memory card values are dropped on conflict — the existing row is not updated, and only the DETAIL handler later refreshes it.</p>
+    <p>You don't run concurrent full crawls, so this is theoretical, but worth knowing.</p>
+  </div>
+
+  <div class="finding amber">
+    <header>
+      <span class="badge amber">Worth watching</span>
+      <h3>1c. Multi-category crawls now run sequentially, one Crawlee instance per category</h3>
+    </header>
+    <div class="compare">
+      <div>
+        <div class="label">Old</div>
+<pre><code>const requests = categories.map(...);
+await crawler.run(requests);
+// one queue, one session pool</code></pre>
+      </div>
+      <div>
+        <div class="label">New</div>
+<pre><code>for (const cat of categories) {
+  const c = createCrawler(...);
+  await c.run([req(cat)]);
+}</code></pre>
+      </div>
+    </div>
+    <p><strong>Implications:</strong></p>
+    <ul>
+      <li>Throughput is roughly the same — <code>maxConcurrency: 3</code> was already the cap.</li>
+      <li>Session pool is reset between categories. The old single pool warmed up across all categories; the new approach starts cold each time. For a non-aggressive site like Encuentra24 this is unlikely to cause blocks, but it is a change.</li>
+      <li>A few seconds of lost overlap at category boundaries. Negligible at full-crawl scale.</li>
+      <li><code>betweenCategoryDelaySecs: 5</code> was added to config but is <strong>never read</strong> anywhere in code. Either dead or intended for future use.</li>
+    </ul>
+  </div>
+
+  <div class="finding amber">
+    <header>
+      <span class="badge amber">Worth watching</span>
+      <h3>1d. <code>config.crawler.listingsPerPage</code> changed from <code>30</code> to <code>20</code></h3>
+    </header>
+    <p>Used only at <span class="filepath">src/crawler/router.ts:351</span> as a <em>fallback</em> for max-page estimation when the flight payload lacks <code>metadata.totalPages</code> but has <code>metadata.total</code>.</p>
+    <p>The primary pagination path comes from <code>metadata.totalPages</code> directly (<span class="filepath">src/crawler/extractors/list-page.ts:234</span>), so this change is mostly harmless — a wrong value just causes a few extra empty pages that the LIST handler short-circuits with "no listings found."</p>
+    <p>Verify the actual page size empirically; if E24 still serves 30, you'll just over-paginate slightly on edge cases.</p>
+  </div>
+
+  <div class="finding green">
+    <header>
+      <span class="badge green">Preserved</span>
+      <h3>1e. Full-crawl removed-listing detection still works</h3>
+    </header>
+    <p>The safety check (<code>activeCount &gt;= 1000 &amp;&amp; seen &lt; 50%</code> aborts) and the <code>crawl_seen_listings</code>-based marking logic are unchanged. <code>tracksSeenListings</code> is still computed once and propagated through every per-category crawler in the sequential loop.</p>
+    <p>The new <code>crawlDetails: false</code> mode does <strong>not</strong> break removal detection — seen-tracking happens in the LIST handler, independent of detail crawling.</p>
+    <p>This is the most important reliability invariant and it survives.</p>
+  </div>
+
+  <div class="finding green">
+    <header>
+      <span class="badge green">Fixed</span>
+      <h3>1f. Stats counting is now correct</h3>
+    </header>
+    <p>The old <code>getCrawlStats()</code> did <code>SELECT COUNT(*) FROM listings</code> and stored that as <code>listingsFound</code> for every run, which was wildly wrong (it returned the size of the entire table, not what this run found).</p>
+    <p>The new code uses runtime counters from the metrics module, with a special fallback to <code>crawl_seen_listings</code> for full crawls. <strong>This is a correctness fix, not a regression.</strong></p>
+    <div class="callout">
+      <strong>Heads up:</strong> historic <code>crawl_runs.listings_found</code> rows from before this change are still meaningless — be aware when comparing trend lines across the migration boundary.
+    </div>
+  </div>
+
+  <div class="finding green">
+    <header>
+      <span class="badge green">Fixed</span>
+      <h3>1g. Log levels actually work now</h3>
+    </header>
+    <p>Old code: <code>--log-level error</code> was silently treated as <code>info</code>. The new <code>toLogLevel()</code> maps debug/info/warn/error correctly.</p>
+    <p>Just flagging in case you scripted around the old quirk.</p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section id="section-risks">
+  <h2>2. Higher-risk concerns</h2>
+
+  <div class="finding red">
+    <header>
+      <span class="badge red">Higher risk</span>
+      <h3>2a. The two migration folders are a footgun</h3>
+    </header>
+    <p><span class="filepath">drizzle/</span> (new) is an auto-generated <strong>fresh-start snapshot</strong> that does <code>CREATE TABLE</code> (not <code>IF NOT EXISTS</code>) for every crawler table. <span class="filepath">migrations/</span> (existing) holds the four manually-written incremental SQL files that have been applied to production by hand.</p>
+    <p><span class="filepath">src/db/migrate.ts</span> points to <code>./drizzle</code> (and was already pointing there at HEAD — not changed in this branch). So:</p>
+    <ul>
+      <li>If anyone runs <code>npm run db:migrate</code> against production, every <code>CREATE TABLE</code> will fail because tables already exist. PostgreSQL transactions roll back cleanly — <strong>no data loss</strong> — but the migrator's tracking table (<code>__drizzle_migrations</code>) is left in an inconsistent state, breaking future drizzle-managed migrations.</li>
+      <li><span class="filepath">drizzle/0000_wooden_moon_knight.sql</span> does <strong>not</strong> include the web-only tables <code>notification_digest_runs</code>, <code>notification_digest_items</code>, <code>notification_recipients</code>, <code>notification_deliveries</code>. A fresh local DB initialized from <code>./drizzle</code> will miss them; the WhatsApp digest endpoints will 500.</li>
+      <li>The <span class="filepath">CLAUDE.md</span> rule "NEVER use <code>db:push</code> against production — use migrations only" is the right call, but <code>db:migrate</code> itself is now also unsafe-to-run against prod.</li>
+    </ul>
+    <div class="callout">
+      <strong>Suggested mitigation</strong> before merging: either delete <code>drizzle/</code> and keep using manual SQL files, or add <code>IF NOT EXISTS</code> to every CREATE in <code>0000_wooden_moon_knight.sql</code> so it's idempotent for production. At minimum, document this in <code>CLAUDE.md</code>.
+    </div>
+  </div>
+
+  <div class="finding red">
+    <header>
+      <span class="badge red">Higher risk</span>
+      <h3>2b. Apify Actor adds a brand-new failure surface</h3>
+    </header>
+    <p><span class="filepath">src/actor/encuentra24.ts</span> is the new entry point for Crawlee Cloud / Apify runs. It's well-structured (zod-validated input, OUTPUT key write, <code>closeDb()</code> in finally), but:</p>
+    <ul>
+      <li>It uses <strong>top-level <code>await</code></strong> with <code>await Actor.init()</code> and writes via <code>Actor.pushData</code> and <code>Actor.setValue</code>. If <code>Actor.init()</code> ever throws (token issues, env mismatch), you skip the catch handler entirely.</li>
+      <li>The whole flow assumes <code>apify</code> is actually installed at runtime. The Dockerfile copies <code>node_modules</code> from the build stage after <code>npm prune --omit=dev</code>, and <code>apify</code> is a regular dep, so that should be fine — but worth a smoke test of the built image: <code>docker run … node dist/actor/encuentra24.js</code> against the local DB.</li>
+      <li>Sessions are not persistent (<code>persistCrawlerStorage: false</code> for actor runs), so any crash mid-run <strong>loses all in-flight URLs</strong>. Apify won't retry partial runs; you'd need to re-run the whole thing. Same as before for the GCE VM cron, but it's worth knowing.</li>
+    </ul>
+  </div>
+
+  <div class="finding amber">
+    <header>
+      <span class="badge amber">Worth watching</span>
+      <h3>2c. Dataset sync floods the Apify dataset on full crawls</h3>
+    </header>
+    <p>With <code>syncDataset: true</code> (the actor default), a full crawl pushes ~45,000 <code>listing.card.inserted</code> events plus per-detail events to the Apify dataset.</p>
+    <p>That's roughly 1,500 batched <code>Actor.pushData()</code> calls of ~30 events each, plus <strong>45,000 detail events done one-at-a-time</strong> (because the DETAIL handler pushes per request) — see <span class="filepath">src/crawler/router.ts:582-608</span>.</p>
+    <p>If you hit any rate limit it just logs a warning and continues (<span class="filepath">src/crawler/dataset-sync.ts:62-67</span>), so the dataset will have gaps. PostgreSQL is the source of truth, so data integrity is fine — but if you rely on the dataset for monitoring, gaps will show.</p>
+    <div class="callout">
+      <strong>Suggestion:</strong> consider batching detail events too, or making <code>syncDataset: false</code> the default for full mode.
+    </div>
+  </div>
+
+  <div class="finding amber">
+    <header>
+      <span class="badge amber">Worth watching</span>
+      <h3>2d. Per-detail dataset event includes the entire <code>updates</code> object</h3>
+    </header>
+    <p>At <span class="filepath">src/crawler/router.ts:599</span>:</p>
+<pre><code>listing: { ..., ...updates, rawJsonLd: undefined, ... }</code></pre>
+    <p><code>updates</code> may include <code>images</code> (an array), <code>amenities</code>, <code>description</code> (long text). The <code>compactValue</code> helper truncates strings &gt;1000 chars, but it does <strong>not</strong> truncate large arrays or descend into nested objects.</p>
+    <p>A listing with 30 image URLs sends a big payload per detail. Memory is fine; ingress cost on Apify is what to watch.</p>
+  </div>
+
+  <div class="finding amber">
+    <header>
+      <span class="badge amber">Worth watching</span>
+      <h3>2e. The <code>agents/route.ts</code> change is unrelated and buried in this branch</h3>
+    </header>
+    <p>The diff in <span class="filepath">web/src/app/api/agents/route.ts</span> (INNER JOIN → LEFT JOIN, swapping the location filter from <code>pa.primary_location</code> to <code>l.location</code>, and the location dropdown query) is a <strong>separate logic fix</strong> in the agents API. It's not part of the crawler migration.</p>
+    <p>Mixed in here it's hard to review carefully — recommend splitting it into its own commit/PR.</p>
+    <p>Verify the LEFT JOIN isn't producing duplicate agents now (since <code>primary_areas</code> may have multiple rows per seller in some configurations) before shipping.</p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section id="section-small">
+  <h2>3. Smaller findings</h2>
+
+  <div class="finding blue">
+    <header>
+      <span class="badge blue">Note</span>
+      <h3>3a. CLI <code>--skip-details</code> wired correctly</h3>
+    </header>
+    <p><span class="filepath">src/cli/commands/crawl.ts</span> correctly wires the new <code>--skip-details</code> flag. Old cron scripts (<span class="filepath">scripts/vm-crawl.sh</span>) use <code>--full</code> only — they keep working as before. <strong>No CLI regression.</strong></p>
+  </div>
+
+  <div class="finding blue">
+    <header>
+      <span class="badge blue">Note</span>
+      <h3>3b. <code>migrate.ts</code> uses top-level await + <code>process.exitCode</code></h3>
+    </header>
+    <p>This is cleaner but means migration failures no longer exit immediately — they wait for <code>closeDb()</code> to finish. Generally fine; just note that any hung pg connection could delay the process.</p>
+  </div>
+
+  <div class="finding blue">
+    <header>
+      <span class="badge blue">Note</span>
+      <h3>3c. Per-instance <code>Configuration</code> is correct, but watch <code>./storage</code> in multi-category mode</h3>
+    </header>
+    <p><code>createCrawler</code> accepts a <code>Configuration</code> per instance (good), but you could leak <code>./storage</code> pollution across category boundaries if you ever set <code>persistCrawlerStorage: true</code> in multi-category mode — <code>cleanupStorage</code> only runs once at the start of <code>runCrawl()</code>.</p>
+    <p>With the default <code>false</code>, this is moot.</p>
+  </div>
+
+  <div class="finding blue">
+    <header>
+      <span class="badge blue">Note</span>
+      <h3>3d. <code>incrementCrawlMetric()</code> silently no-ops if the run isn't tracked</h3>
+    </header>
+    <p>See <span class="filepath">src/crawler/metrics.ts:36-37</span>. If a request fails after <code>finishCrawlMetrics()</code> (e.g., a late retry on shutdown), its error counter is dropped.</p>
+    <p>Edge-case logging gap, not a correctness bug.</p>
+  </div>
+
+  <div class="finding blue">
+    <header>
+      <span class="badge blue">Note</span>
+      <h3>3e. <code>crawl_runs</code> row on failure only sets <code>status</code> + <code>errors</code></h3>
+    </header>
+    <p>Other counters stay at their defaults (0). Same behavior as the old code, but worth knowing for post-mortems on partial crawls.</p>
+  </div>
+
+  <div class="finding blue">
+    <header>
+      <span class="badge blue">Note</span>
+      <h3>3f. <code>probe-site</code> and <code>ph</code> commands are read-only and well-isolated</h3>
+    </header>
+    <p>Low risk. PH (propiedad horizontal) detection is a separate analysis tool unrelated to ingestion.</p>
+  </div>
+
+  <div class="finding blue">
+    <header>
+      <span class="badge blue">Note</span>
+      <h3>3g. Crawler timeouts unchanged</h3>
+    </header>
+    <p><code>requestHandlerTimeoutSecs: 60</code> and <code>navigationTimeoutSecs: 30</code> are unchanged — same as before.</p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section id="section-checklist">
+  <h2>4. What to verify before cutting over</h2>
+
+  <div class="checklist">
+    <ol>
+      <li>
+        <strong>Run the actor against a fresh local DB twice</strong>
+        <p>Run an incremental, then a small full crawl, and diff the resulting <code>listings</code> row counts and <code>crawl_runs.listings_found</code> against a known-good production-derived snapshot for the same category.</p>
+      </li>
+      <li>
+        <strong>Decide on the migration story</strong>
+        <p>Either delete <code>drizzle/</code>, or make it idempotent (<code>CREATE TABLE IF NOT EXISTS</code>), or document loudly that <code>db:migrate</code> must never run on prod. This is the single highest-risk item in the branch.</p>
+      </li>
+      <li>
+        <strong>Test the actor's failure path</strong>
+        <p>Trip <code>Actor.init()</code> (e.g., bad token) and confirm <code>closeDb()</code> still gets called and the process exits cleanly. The top-level <code>await</code> can bypass the catch on init failure.</p>
+      </li>
+      <li>
+        <strong>Smoke the Docker image</strong>
+        <p>Run <code>docker build</code> then run the image with <code>E24_ACTOR_INPUT_JSON='{"mode":"incremental","maxPages":1}'</code> against a disposable DB. The Dockerfile's <code>npm prune --omit=dev</code> is the most likely place a missing runtime dep would surface.</p>
+      </li>
+      <li>
+        <strong>Confirm the <code>web/src/app/api/agents/route.ts</code> change is intentional and correct</strong>
+        <p>It's a separate concern that snuck into this branch. Validate that the LEFT JOIN doesn't produce duplicate agent rows.</p>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<footer class="report-foot">
+  Sources reviewed: full diffs of <code>src/crawler/router.ts</code>, <code>src/crawler/index.ts</code>, <code>src/db/migrate.ts</code>, <code>src/config.ts</code>, <code>src/cli/commands/crawl.ts</code>, <code>src/index.ts</code>, <code>web/src/app/api/agents/route.ts</code>; new files <code>src/actor/encuentra24.ts</code>, <code>src/crawler/dataset-sync.ts</code>, <code>src/crawler/metrics.ts</code>, <code>src/cli/commands/probe-site.ts</code>, <code>src/cli/commands/ph.ts</code>, <code>src/ph/detector.ts</code>, <code>Dockerfile</code>, <code>.actor/</code>, <code>drizzle/0000_wooden_moon_knight.sql</code>, the existing <code>migrations/*.sql</code> files for context, and supporting scripts under <code>scripts/</code>. Project-wide type-check passed.
+</footer>
+
+</div>
+</body>
+</html>
