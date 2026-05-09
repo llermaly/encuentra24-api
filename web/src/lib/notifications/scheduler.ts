@@ -1,4 +1,5 @@
 import { and, eq } from 'drizzle-orm';
+import type sharp from 'sharp';
 import { db } from '@/db';
 import { notificationDeliveries } from '@/db/schema';
 import {
@@ -26,6 +27,17 @@ const DEFAULT_CARD_LIMIT = 10;
 const DEFAULT_MESSAGE_DELAY_MS = 5000;
 const MIN_MESSAGE_DELAY_MS = 1000;
 const MAX_MESSAGE_DELAY_MS = 30000;
+const IMAGE_FETCH_TIMEOUT_MS = 15000;
+const WHATSAPP_IMAGE_MIMETYPE = 'image/jpeg';
+const WHATSAPP_IMAGE_EXTENSION = 'jpg';
+const WHATSAPP_IMAGE_MAX_SIZE = 1280;
+const WHATSAPP_IMAGE_QUALITY = 84;
+const WHATSAPP_NATIVE_IMAGE_TYPES = new Set(['image/jpeg', 'image/png']);
+
+type SharpFactory = typeof sharp;
+type SharpModule = { default: SharpFactory };
+
+let sharpPromise: Promise<SharpFactory | null> | null = null;
 
 interface NotificationRecipientRow {
   id: number;
@@ -103,30 +115,62 @@ function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-function imageFileExtension(mimetype: string) {
-  switch (mimetype) {
-    case 'image/png':
-      return 'png';
-    case 'image/webp':
-      return 'webp';
-    case 'image/avif':
-      return 'avif';
-    default:
-      return 'jpg';
+function loadSharp() {
+  sharpPromise ??= import('sharp')
+    .then(module => (module as unknown as SharpModule).default)
+    .catch(() => null);
+  return sharpPromise;
+}
+
+async function normalizeImageForWhatsapp(buffer: Buffer, mimetype: string) {
+  const sharp = await loadSharp();
+
+  if (!sharp) {
+    if (WHATSAPP_NATIVE_IMAGE_TYPES.has(mimetype)) {
+      return { media: buffer, mimetype, extension: mimetype === 'image/png' ? 'png' : 'jpg' };
+    }
+
+    throw new Error(`Thumbnail conversion unavailable for ${mimetype}`);
   }
+
+  const media = await sharp(buffer)
+    .rotate()
+    .resize({
+      width: WHATSAPP_IMAGE_MAX_SIZE,
+      height: WHATSAPP_IMAGE_MAX_SIZE,
+      fit: 'inside',
+      withoutEnlargement: true,
+    })
+    .jpeg({ quality: WHATSAPP_IMAGE_QUALITY })
+    .toBuffer();
+
+  return {
+    media,
+    mimetype: WHATSAPP_IMAGE_MIMETYPE,
+    extension: WHATSAPP_IMAGE_EXTENSION,
+  };
 }
 
 async function fetchListingImage(listing: DigestListing) {
   if (!listing.thumbnail) return null;
 
-  const response = await fetch(listing.thumbnail, {
-    headers: {
-      accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-      referer: listing.url ?? 'https://www.encuentra24.com/',
-      'user-agent':
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
-    },
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), IMAGE_FETCH_TIMEOUT_MS);
+
+  let response: Response;
+  try {
+    response = await fetch(listing.thumbnail, {
+      signal: controller.signal,
+      headers: {
+        accept: 'image/jpeg,image/png,image/webp,image/*;q=0.8,*/*;q=0.5',
+        referer: listing.url ?? 'https://www.encuentra24.com/',
+        'user-agent':
+          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+      },
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!response.ok) {
     throw new Error(`Thumbnail fetch failed (${response.status})`);
@@ -134,10 +178,12 @@ async function fetchListingImage(listing: DigestListing) {
 
   const arrayBuffer = await response.arrayBuffer();
   const mimetype = response.headers.get('content-type')?.split(';')[0] || 'image/jpeg';
+  const image = await normalizeImageForWhatsapp(Buffer.from(arrayBuffer), mimetype);
 
   return {
-    media: Buffer.from(arrayBuffer).toString('base64'),
-    mimetype,
+    media: image.media.toString('base64'),
+    mimetype: image.mimetype,
+    extension: image.extension,
   };
 }
 
@@ -309,7 +355,7 @@ async function sendCardMessage(destination: string, card: WhatsappDigestCard) {
       media: image.media,
       mimetype: image.mimetype,
       caption,
-      fileName: `${card.listing.adId}.${imageFileExtension(image.mimetype)}`,
+      fileName: `${card.listing.adId}.${image.extension}`,
     });
   } catch {
     return sendEvoTextMessage(destination, renderWhatsappListingTextFallback(card));
