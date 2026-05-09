@@ -212,7 +212,7 @@ export default function DailySummaryPreviewPage() {
     [digest]
   );
   const whatsappMessages = useMemo(
-    () => renderWhatsappDigestMessages(digest, cadence),
+    () => renderWhatsappDigestMessages(digest, cadence, 10),
     [digest, cadence]
   );
 

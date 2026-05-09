@@ -7,13 +7,25 @@ import {
   markDailySummaryFailed,
   markDailySummarySent,
   type DailySummaryDigest,
+  type DigestListing,
   type SummaryCadence,
 } from '@/lib/notifications/daily-summary';
-import { sendEvoTextMessage } from '@/lib/notifications/evo';
+import { sendEvoImageMessage, sendEvoTextMessage } from '@/lib/notifications/evo';
 import { listEnabledRecipientsByCadence, maskDestination } from '@/lib/notifications/recipients';
-import { renderWhatsappDigestMessages } from '@/lib/notifications/whatsapp-summary';
+import {
+  getWhatsappDigestCards,
+  renderWhatsappDigestIntroMessage,
+  renderWhatsappDigestOverflowMessage,
+  renderWhatsappListingCardCaption,
+  renderWhatsappListingTextFallback,
+  type WhatsappDigestCard,
+} from '@/lib/notifications/whatsapp-summary';
 
 const PANAMA_OFFSET_MS = 5 * 60 * 60 * 1000;
+const DEFAULT_CARD_LIMIT = 10;
+const DEFAULT_MESSAGE_DELAY_MS = 5000;
+const MIN_MESSAGE_DELAY_MS = 1000;
+const MAX_MESSAGE_DELAY_MS = 30000;
 
 interface NotificationRecipientRow {
   id: number;
@@ -28,6 +40,10 @@ interface DeliveryResult {
   destination: string;
   status: 'sent' | 'skipped' | 'failed';
   error?: string;
+}
+
+interface MessageSender {
+  send: () => Promise<{ providerMessageId: string | null; status: string | null }>;
 }
 
 export interface ScheduledDigestResult {
@@ -69,6 +85,60 @@ function groupByUser(recipients: NotificationRecipientRow[]) {
     groups.set(recipient.userId, existing);
   }
   return groups;
+}
+
+function getCardLimit() {
+  const configured = Number(process.env.WHATSAPP_DIGEST_CARD_LIMIT ?? DEFAULT_CARD_LIMIT);
+  if (!Number.isFinite(configured) || configured <= 0) return DEFAULT_CARD_LIMIT;
+  return Math.min(Math.floor(configured), 25);
+}
+
+function getMessageDelayMs() {
+  const configured = Number(process.env.WHATSAPP_DIGEST_MESSAGE_DELAY_MS ?? DEFAULT_MESSAGE_DELAY_MS);
+  if (!Number.isFinite(configured)) return DEFAULT_MESSAGE_DELAY_MS;
+  return Math.min(Math.max(Math.floor(configured), MIN_MESSAGE_DELAY_MS), MAX_MESSAGE_DELAY_MS);
+}
+
+function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function imageFileExtension(mimetype: string) {
+  switch (mimetype) {
+    case 'image/png':
+      return 'png';
+    case 'image/webp':
+      return 'webp';
+    case 'image/avif':
+      return 'avif';
+    default:
+      return 'jpg';
+  }
+}
+
+async function fetchListingImage(listing: DigestListing) {
+  if (!listing.thumbnail) return null;
+
+  const response = await fetch(listing.thumbnail, {
+    headers: {
+      accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+      referer: listing.url ?? 'https://www.encuentra24.com/',
+      'user-agent':
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Thumbnail fetch failed (${response.status})`);
+  }
+
+  const arrayBuffer = await response.arrayBuffer();
+  const mimetype = response.headers.get('content-type')?.split(';')[0] || 'image/jpeg';
+
+  return {
+    media: Buffer.from(arrayBuffer).toString('base64'),
+    mimetype,
+  };
 }
 
 async function createOrLoadDelivery(
@@ -137,10 +207,54 @@ async function sendDigestToRecipient(
   }
 
   try {
-    const providerIds: string[] = [];
-    for (const text of renderWhatsappDigestMessages(digest, cadence)) {
-      const result = await sendEvoTextMessage(recipient.destination, text);
-      if (result.providerMessageId) providerIds.push(result.providerMessageId);
+    const cardLimit = getCardLimit();
+    const messageDelayMs = getMessageDelayMs();
+    const cards = getWhatsappDigestCards(digest, cardLimit);
+    const totalCardCount = cards[0]?.total ?? 0;
+    const extraCount = totalCardCount - cards.length;
+    const messageSenders: MessageSender[] = [
+      {
+        send: () => sendEvoTextMessage(
+          recipient.destination,
+          renderWhatsappDigestIntroMessage(digest, cadence, cardLimit)
+        ),
+      },
+      ...cards.map(card => ({
+        send: () => sendCardMessage(recipient.destination, card),
+      })),
+    ];
+
+    if (extraCount > 0) {
+      messageSenders.push({
+        send: () => sendEvoTextMessage(
+          recipient.destination,
+          renderWhatsappDigestOverflowMessage(extraCount)
+        ),
+      });
+    }
+
+    const providerIds = delivery.providerMessageId
+      ? delivery.providerMessageId.split(',').filter(Boolean)
+      : [];
+
+    await db
+      .update(notificationDeliveries)
+      .set({ status: 'sending', errorMessage: null })
+      .where(eq(notificationDeliveries.id, delivery.id));
+
+    for (let index = providerIds.length; index < messageSenders.length; index += 1) {
+      if (index > 0) await sleep(messageDelayMs);
+      const result = await messageSenders[index].send();
+      providerIds.push(result.providerMessageId ?? `sent-${index + 1}`);
+
+      await db
+        .update(notificationDeliveries)
+        .set({
+          status: 'sending',
+          providerMessageId: providerIds.join(','),
+          errorMessage: null,
+        })
+        .where(eq(notificationDeliveries.id, delivery.id));
     }
 
     await db
@@ -174,6 +288,31 @@ async function sendDigestToRecipient(
       status: 'failed',
       error: message,
     };
+  }
+}
+
+async function sendCardMessage(destination: string, card: WhatsappDigestCard) {
+  const caption = renderWhatsappListingCardCaption(card);
+
+  if (!card.listing.thumbnail) {
+    return sendEvoTextMessage(destination, renderWhatsappListingTextFallback(card));
+  }
+
+  try {
+    const image = await fetchListingImage(card.listing);
+    if (!image) {
+      return sendEvoTextMessage(destination, renderWhatsappListingTextFallback(card));
+    }
+
+    return sendEvoImageMessage({
+      destination,
+      media: image.media,
+      mimetype: image.mimetype,
+      caption,
+      fileName: `${card.listing.adId}.${imageFileExtension(image.mimetype)}`,
+    });
+  } catch {
+    return sendEvoTextMessage(destination, renderWhatsappListingTextFallback(card));
   }
 }
 

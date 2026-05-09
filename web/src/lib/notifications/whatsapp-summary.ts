@@ -2,10 +2,16 @@ import { formatDate, formatPrice } from '@/lib/formatters';
 import type {
   DailySummaryDigest,
   DigestListing,
+  DigestSearchGroup,
   SummaryCadence,
 } from '@/lib/notifications/daily-summary';
 
-const MAX_MESSAGE_LENGTH = 3200;
+export interface WhatsappDigestCard {
+  listing: DigestListing;
+  searchName: string;
+  index: number;
+  total: number;
+}
 
 function cadenceNoun(cadence: SummaryCadence) {
   return cadence === 'daily' ? 'day' : 'week';
@@ -23,66 +29,114 @@ function locationLine(listing: DigestListing) {
   return [listing.location, listing.city, listing.province].filter(Boolean).join(', ');
 }
 
-function renderListing(listing: DigestListing, index: number) {
-  const lines = [
-    `${index}. ${formatPrice(listing.price, listing.currency ?? 'USD')} - ${listing.title || listing.adId}`,
-  ];
-  const location = locationLine(listing);
-  const meta = listingMeta(listing);
-  if (location) lines.push(location);
-  if (meta) lines.push(meta);
-  if (listing.url) lines.push(listing.url);
-  return lines.join('\n');
+function getTotalListings(digest: DailySummaryDigest) {
+  return digest.savedSearches.reduce((sum, group) => sum + group.listings.length, 0);
 }
 
-function getHeader(digest: DailySummaryDigest, cadence: SummaryCadence, totalListings: number) {
-  const label = cadence === 'daily' ? 'Daily' : 'Weekly';
+function getSearchCounts(groups: DigestSearchGroup[]) {
+  return groups
+    .map(group => ({
+      name: group.name,
+      count: group.listings.length,
+    }))
+    .filter(group => group.count > 0);
+}
+
+function cadenceLabel(cadence: SummaryCadence) {
+  return cadence === 'daily' ? 'daily' : 'weekly';
+}
+
+export function getWhatsappDigestCards(
+  digest: DailySummaryDigest,
+  limit = Number.POSITIVE_INFINITY
+): WhatsappDigestCard[] {
+  const allCards = digest.savedSearches.flatMap(group =>
+    group.listings.map(listing => ({
+      listing,
+      searchName: group.name,
+    }))
+  );
+  const total = allCards.length;
+  return allCards.slice(0, limit).map((card, index) => ({
+    ...card,
+    index: index + 1,
+    total,
+  }));
+}
+
+export function renderWhatsappDigestIntroMessage(
+  digest: DailySummaryDigest,
+  cadence: SummaryCadence,
+  cardLimit = Number.POSITIVE_INFINITY
+) {
+  const totalListings = getTotalListings(digest);
+  const label = cadenceLabel(cadence);
+
+  if (totalListings === 0) {
+    return [
+      `Encuentra24 ${label} summary`,
+      `${formatDate(digest.periodStart)} to ${formatDate(digest.periodEnd)}`,
+      '',
+      `No new properties for the ${cadenceNoun(cadence)}.`,
+    ].join('\n');
+  }
+
+  const searchCounts = getSearchCounts(digest.savedSearches);
+  const searchWord = searchCounts.length === 1 ? 'saved search' : 'saved searches';
+  const shownCount = Math.min(totalListings, cardLimit);
+
   return [
-    `Encuentra24 ${label.toLowerCase()} WhatsApp summary`,
+    `Encuentra24 ${label} summary`,
     `${formatDate(digest.periodStart)} to ${formatDate(digest.periodEnd)}`,
     '',
-    `${totalListings} new ${totalListings === 1 ? 'property' : 'properties'} from your saved searches.`,
+    `${totalListings} new ${totalListings === 1 ? 'property' : 'properties'} across ${searchCounts.length} ${searchWord}:`,
+    ...searchCounts.map(group => `- ${group.name}: ${group.count} ${group.count === 1 ? 'property' : 'properties'}`),
+    '',
+    shownCount === totalListings
+      ? 'Sending property cards next with thumbnails and links.'
+      : `Sending the first ${shownCount} property cards next with thumbnails and links.`,
   ].join('\n');
+}
+
+export function renderWhatsappListingCardCaption(card: WhatsappDigestCard) {
+  const { listing, searchName, index, total } = card;
+  const lines = [
+    `${index}/${total} - ${formatPrice(listing.price, listing.currency ?? 'USD')} - ${listing.title || listing.adId}`,
+    '',
+    locationLine(listing),
+    listingMeta(listing),
+    '',
+    `Saved search: ${searchName}`,
+    `Seen: ${formatDate(listing.eventAt)}`,
+    '',
+    listing.url,
+  ];
+
+  return lines.filter(line => line != null && line !== '').join('\n');
+}
+
+export function renderWhatsappListingTextFallback(card: WhatsappDigestCard) {
+  return renderWhatsappListingCardCaption(card);
+}
+
+export function renderWhatsappDigestOverflowMessage(extraCount: number) {
+  return `+${extraCount} more new ${extraCount === 1 ? 'property' : 'properties'}. Open the dashboard to review the rest.`;
 }
 
 export function renderWhatsappDigestMessages(
   digest: DailySummaryDigest,
-  cadence: SummaryCadence
+  cadence: SummaryCadence,
+  cardLimit = Number.POSITIVE_INFINITY
 ) {
-  const totalListings = digest.savedSearches.reduce((sum, group) => sum + group.listings.length, 0);
+  const totalListings = getTotalListings(digest);
+  const messages = [renderWhatsappDigestIntroMessage(digest, cadence, cardLimit)];
 
-  if (totalListings === 0) {
-    return [[
-      `Encuentra24 ${cadence} WhatsApp summary`,
-      `${formatDate(digest.periodStart)} to ${formatDate(digest.periodEnd)}`,
-      '',
-      `No new properties for the ${cadenceNoun(cadence)}.`,
-    ].join('\n')];
+  if (totalListings > 0) {
+    const cards = getWhatsappDigestCards(digest, cardLimit);
+    messages.push(...cards.map(renderWhatsappListingCardCaption));
+    const extraCount = totalListings - cards.length;
+    if (extraCount > 0) messages.push(renderWhatsappDigestOverflowMessage(extraCount));
   }
 
-  const messages: string[] = [];
-  let current = getHeader(digest, cadence, totalListings);
-  let itemIndex = 1;
-
-  for (const group of digest.savedSearches) {
-    const groupHeader = `\n\n${group.name}`;
-    if ((current + groupHeader).length > MAX_MESSAGE_LENGTH) {
-      messages.push(current);
-      current = `${getHeader(digest, cadence, totalListings)}\n\nContinued`;
-    }
-    current += groupHeader;
-
-    for (const listing of group.listings) {
-      const block = `\n\n${renderListing(listing, itemIndex)}`;
-      if ((current + block).length > MAX_MESSAGE_LENGTH) {
-        messages.push(current);
-        current = `${getHeader(digest, cadence, totalListings)}\n\nContinued`;
-      }
-      current += block;
-      itemIndex += 1;
-    }
-  }
-
-  if (current.trim()) messages.push(current);
   return messages;
 }
