@@ -63,9 +63,9 @@ export async function GET(request: NextRequest) {
         ) sub WHERE rn = 1
       )
     `;
-    const locationJoin = 'JOIN primary_areas pa ON pa.seller_name = l.seller_name';
+    const locationJoin = 'LEFT JOIN primary_areas pa ON pa.seller_name = l.seller_name';
     const locationWhere = location
-      ? `AND pa.primary_location = '${location.replace(/'/g, "''")}'`
+      ? `AND l.location = '${location.replace(/'/g, "''")}'`
       : '';
 
     if (view === 'agents') {
@@ -187,12 +187,13 @@ export async function GET(request: NextRequest) {
         GROUP BY seller_type
         ORDER BY count DESC
       `),
-      // Locations ranked by how many sellers have it as primary area
+      // Locations ranked by active listing volume. The filter above uses exact
+      // listing locations, so the dropdown counts should describe the same unit.
       db.all<{ location: string; count: number }>(sql.raw(`
-        WITH ${primaryAreaCte}
-        SELECT primary_location as location, COUNT(*) as count
-        FROM primary_areas
-        GROUP BY primary_location
+        SELECT location, COUNT(*) as count
+        FROM listings
+        WHERE seller_name IS NOT NULL AND removed_at IS NULL AND location IS NOT NULL
+        GROUP BY location
         ORDER BY count DESC
       `)),
     ]);
@@ -200,7 +201,7 @@ export async function GET(request: NextRequest) {
     const total = countData[0]?.total || 0;
 
     // Enrich with seller contact data
-    const names = agenciesData.map((a: any) => a.seller_name);
+    const names = agenciesData.map((a) => a.seller_name);
     let sellerMap = new Map<string, { whatsapp: string | null; phone: string | null; profile_url: string | null }>();
 
     if (names.length > 0) {
@@ -211,9 +212,9 @@ export async function GET(request: NextRequest) {
         SELECT name, whatsapp, phone, profile_url
         FROM sellers
         WHERE name IN (${sql.join(namePlaceholders, sql`, `)})
-      `).catch(() => [] as any[]);
+      `).catch(() => [] as { name: string; whatsapp: string | null; phone: string | null; profile_url: string | null }[]);
 
-      sellerMap = new Map(sellerResults.map((s: any) => [s.name, s]));
+      sellerMap = new Map(sellerResults.map((s) => [s.name, s]));
     }
 
     return NextResponse.json({
@@ -224,8 +225,8 @@ export async function GET(request: NextRequest) {
         totalPortfolioValue: stats.total_portfolio_value,
         avgListingsPerSeller: Math.round(stats.avg_listings_per_seller * 10) / 10,
       },
-      sellerTypes: typesResult.map((t: any) => ({ value: t.seller_type, count: t.count })),
-      locations: locationsResult.map((l: any) => ({ value: l.location, count: Number(l.count) })),
+      sellerTypes: typesResult.map((t) => ({ value: t.seller_type, count: t.count })),
+      locations: locationsResult.map((l) => ({ value: l.location, count: Number(l.count) })),
       data: agenciesData.map((a, i) => {
         const seller = sellerMap.get(a.seller_name);
         return {

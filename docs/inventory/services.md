@@ -30,6 +30,19 @@ Stage database:
 - Created: 2026-05-03
 - Purpose: disposable stage copy of production data for the Vercel `stage` custom environment.
 
+Crawlee migration database:
+- Name: `encuentra24-crawlee-db`
+- UUID: `z11hfr52rm9dcdb66rxt0vk3`
+- Type: standalone PostgreSQL
+- Image: `postgres:18.3-alpine`
+- Public port: `54323`
+- Database/user: `encuentra24_crawlee`
+- Limits: `1` CPU, `1g` memory, `0` swap
+- Created: 2026-05-09
+- Purpose: parallel Crawlee Cloud migration validation database. Keep legacy production crawler on `encuentra24-db` while actor runs write here.
+- Last seed: production restore on 2026-05-09. Matching post-restore counts: `listings` 101062, `price_history` 18038, `sellers` 1542, `crawl_runs` 1389, `crawl_errors` 3284, `crawl_seen_listings` 86320.
+- Smoke: actor-style incremental `new_project/proyectos-nuevos` run `1390` completed with 1 page, 4 listings found, 0 errors.
+
 Vercel project:
 - Name: `encuentra24-api`
 - Project ID: `prj_LccjoDXiORVjhSM2fWo5eUXtskQg`

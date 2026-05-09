@@ -1,0 +1,2 @@
+# One false-positive P.H. candidate per line.
+# The detector normalizes each line before comparing, so punctuation/case do not matter.

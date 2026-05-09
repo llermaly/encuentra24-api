@@ -160,3 +160,121 @@ export const crawlErrors = pgTable('crawl_errors', {
   message: text(),
   occurredAt: text('occurred_at').notNull(),
 });
+
+export const favorites = pgTable('favorites', {
+  id: serial().primaryKey(),
+  userId: text('user_id').notNull(),
+  adId: text('ad_id').notNull(),
+  createdAt: text('created_at').notNull(),
+}, (table) => [
+  uniqueIndex('idx_fav_user_ad').on(table.userId, table.adId),
+  index('idx_fav_user_id').on(table.userId),
+]);
+
+export const pipelineItems = pgTable('pipeline_items', {
+  id: serial().primaryKey(),
+  userId: text('user_id').notNull(),
+  adId: text('ad_id').notNull(),
+  stage: text().notNull().default('discovered'),
+  position: integer().notNull().default(0),
+  movedAt: text('moved_at').notNull(),
+  createdAt: text('created_at').notNull(),
+}, (table) => [
+  uniqueIndex('idx_pipe_user_ad').on(table.userId, table.adId),
+  index('idx_pipe_user_id').on(table.userId),
+  index('idx_pipe_stage').on(table.stage),
+]);
+
+export const propertyNotes = pgTable('property_notes', {
+  id: serial().primaryKey(),
+  userId: text('user_id').notNull(),
+  adId: text('ad_id').notNull(),
+  type: text().notNull().default('note'),
+  content: text().notNull(),
+  createdAt: text('created_at').notNull(),
+}, (table) => [
+  index('idx_notes_user_ad').on(table.userId, table.adId),
+  index('idx_notes_user_id').on(table.userId),
+]);
+
+export const savedSearches = pgTable('saved_searches', {
+  id: serial().primaryKey(),
+  userId: text('user_id').notNull(),
+  name: text().notNull(),
+  filters: text().notNull(),
+  lastCheckedAt: text('last_checked_at'),
+  newMatchCount: integer('new_match_count').default(0),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+}, (table) => [
+  index('idx_ss_user_id').on(table.userId),
+]);
+
+export const notificationDigestRuns = pgTable('notification_digest_runs', {
+  id: serial().primaryKey(),
+  userId: text('user_id').notNull(),
+  kind: text().notNull(),
+  scheduleKey: text('schedule_key'),
+  status: text().notNull().default('pending'),
+  periodStart: text('period_start').notNull(),
+  periodEnd: text('period_end').notNull(),
+  itemCount: integer('item_count').notNull().default(0),
+  createdAt: text('created_at').notNull(),
+  sentAt: text('sent_at'),
+  errorMessage: text('error_message'),
+}, (table) => [
+  index('idx_digest_runs_user_kind_status').on(table.userId, table.kind, table.status),
+  uniqueIndex('idx_digest_runs_user_kind_schedule').on(table.userId, table.kind, table.scheduleKey),
+  index('idx_digest_runs_created_at').on(table.createdAt),
+]);
+
+export const notificationDigestItems = pgTable('notification_digest_items', {
+  id: serial().primaryKey(),
+  digestRunId: integer('digest_run_id').notNull(),
+  userId: text('user_id').notNull(),
+  eventType: text('event_type').notNull(),
+  sourceType: text('source_type').notNull(),
+  sourceId: integer('source_id'),
+  adId: text('ad_id').notNull(),
+  eventAt: text('event_at').notNull(),
+  capturedAt: text('captured_at').notNull(),
+}, (table) => [
+  index('idx_digest_items_run_id').on(table.digestRunId),
+  index('idx_digest_items_user_event').on(table.userId, table.eventType),
+  uniqueIndex('idx_digest_items_unique_event').on(table.userId, table.eventType, table.adId, table.eventAt),
+]);
+
+export const notificationRecipients = pgTable('notification_recipients', {
+  id: serial().primaryKey(),
+  userId: text('user_id').notNull(),
+  channel: text().notNull().default('whatsapp'),
+  destination: text().notNull(),
+  label: text(),
+  dailyEnabled: boolean('daily_enabled').notNull().default(true),
+  weeklyEnabled: boolean('weekly_enabled').notNull().default(true),
+  active: boolean().notNull().default(true),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+}, (table) => [
+  index('idx_notification_recipients_user').on(table.userId, table.active),
+  uniqueIndex('idx_notification_recipients_unique_destination').on(table.userId, table.channel, table.destination),
+]);
+
+export const notificationDeliveries = pgTable('notification_deliveries', {
+  id: serial().primaryKey(),
+  digestRunId: integer('digest_run_id').notNull(),
+  recipientId: integer('recipient_id').notNull(),
+  userId: text('user_id').notNull(),
+  channel: text().notNull(),
+  destination: text().notNull(),
+  cadence: text().notNull(),
+  status: text().notNull().default('queued'),
+  providerMessageId: text('provider_message_id'),
+  errorMessage: text('error_message'),
+  createdAt: text('created_at').notNull(),
+  sentAt: text('sent_at'),
+}, (table) => [
+  index('idx_notification_deliveries_user').on(table.userId, table.createdAt),
+  index('idx_notification_deliveries_run').on(table.digestRunId),
+  uniqueIndex('idx_notification_deliveries_unique_recipient').on(table.digestRunId, table.recipientId),
+]);

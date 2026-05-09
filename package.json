@@ -9,11 +9,14 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/index.ts",
+    "actor:local": "tsx src/actor/encuentra24.ts",
+    "probe:site": "tsx src/index.ts probe-site",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "apify": "^3.7.1",
     "cheerio": "^1.0.0-rc.12",
     "commander": "^14.0.3",
     "crawlee": "^3.16.0",

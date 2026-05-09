@@ -6,6 +6,8 @@ import { statusCommand } from './cli/commands/status.js';
 import { exportCommand } from './cli/commands/export.js';
 import { sellersCommand } from './cli/commands/sellers.js';
 import { backfillRemoved } from './cli/commands/backfill-removed.js';
+import { probeSiteCommand } from './cli/commands/probe-site.js';
+import { phCommand } from './cli/commands/ph.js';
 
 const program = new Command();
 
@@ -18,6 +20,8 @@ program.addCommand(crawlCommand);
 program.addCommand(statusCommand);
 program.addCommand(exportCommand);
 program.addCommand(sellersCommand);
+program.addCommand(probeSiteCommand);
+program.addCommand(phCommand);
 
 program
   .command('backfill-removed')

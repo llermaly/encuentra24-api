@@ -12,7 +12,7 @@ export const config = {
     sameDomainDelaySecs: Number(process.env.SAME_DOMAIN_DELAY_SECS) || 2,
     maxRequestRetries: 3,
     defaultMaxPages: 5,
-    listingsPerPage: 30,
+    listingsPerPage: 20,
     betweenCategoryDelaySecs: 5,
   },
   scraper: {

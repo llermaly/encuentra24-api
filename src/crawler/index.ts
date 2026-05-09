@@ -1,11 +1,20 @@
 import { CheerioCrawler, Configuration, log, LogLevel } from 'crawlee';
 import { eq, sql, isNull, lt } from 'drizzle-orm';
 import { rmSync } from 'node:fs';
+import { setTimeout as delay } from 'node:timers/promises';
 import { router } from './router.js';
 import { findCategory, buildListUrl, type CategoryConfig } from './categories.js';
 import { config } from '../config.js';
 import { getDb, initDb } from '../db/connection.js';
 import { listings, crawlRuns, crawlErrors, crawlSeenListings } from '../db/schema.js';
+import { flushListingDatasetEvents } from './dataset-sync.js';
+import {
+  finishCrawlMetrics,
+  getCrawlMetrics,
+  incrementCrawlMetric,
+  startCrawlMetrics,
+  type CrawlRuntimeMetrics,
+} from './metrics.js';
 
 export interface CrawlOptions {
   category?: string;
@@ -14,13 +23,52 @@ export interface CrawlOptions {
   maxPages?: number;
   full?: boolean;
   detailOnly?: boolean;
+  crawlDetails?: boolean;
+  syncDataset?: boolean;
   logLevel?: string;
+  cleanupStorage?: boolean;
+  persistCrawlerStorage?: boolean;
+}
+
+export interface CrawlRunResult {
+  crawlRunId: number;
+  type: 'full' | 'incremental';
+  startedAt: string;
+  finishedAt: string;
+  durationSecs: number;
+  category: string | null;
+  subcategory: string | null;
+  regionSlug: string | null;
+  full: boolean;
+  detailOnly: boolean;
+  crawlDetails: boolean;
+  syncDataset: boolean;
+  removedCount: number;
+  stats: {
+    pagesProcessed: number;
+    listingsFound: number;
+    listingsNew: number;
+    listingsUpdated: number;
+    detailsCrawled: number;
+    errors: number;
+  };
+  runtimeMetrics: CrawlRuntimeMetrics;
+}
+
+function toLogLevel(level: string): LogLevel {
+  const normalized = level.toLowerCase();
+
+  if (normalized === 'debug') return LogLevel.DEBUG;
+  if (normalized === 'warn' || normalized === 'warning') return LogLevel.WARNING;
+  if (normalized === 'error') return LogLevel.ERROR;
+
+  return LogLevel.INFO;
 }
 
 /**
  * Create and configure the CheerioCrawler.
  */
-function createCrawler() {
+function createCrawler(persistCrawlerStorage: boolean) {
   return new CheerioCrawler({
     requestHandler: router,
     minConcurrency: config.crawler.maxConcurrency,
@@ -44,6 +92,7 @@ function createCrawler() {
       const statusCode = statusMatch ? parseInt(statusMatch[1], 10) : null;
 
       log.error(`Request failed: ${request.url}`, { error: errMsg });
+      incrementCrawlMetric(crawlRunId, 'errors');
 
       await db.insert(crawlErrors).values({
         crawlRunId: crawlRunId || null,
@@ -66,13 +115,13 @@ function createCrawler() {
         }
       }
     },
-  });
+  }, new Configuration({ persistStorage: persistCrawlerStorage }));
 }
 
 /**
  * Run the crawler with the given options.
  */
-export async function runCrawl(options: CrawlOptions): Promise<void> {
+export async function runCrawl(options: CrawlOptions): Promise<CrawlRunResult> {
   const {
     category,
     subcategory,
@@ -80,24 +129,27 @@ export async function runCrawl(options: CrawlOptions): Promise<void> {
     maxPages = config.crawler.defaultMaxPages,
     full = false,
     detailOnly = false,
+    crawlDetails = true,
+    syncDataset = false,
     logLevel = config.log.level,
+    cleanupStorage = true,
+    persistCrawlerStorage = false,
   } = options;
 
   // Set log level
-  log.setLevel(logLevel === 'debug' ? LogLevel.DEBUG : LogLevel.INFO);
+  log.setLevel(toLogLevel(logLevel));
 
   // Initialize database connection
   await initDb();
 
-  // Clean up stale storage from previous crashed runs
-  try {
-    rmSync('./storage', { recursive: true, force: true });
-  } catch {
-    // ignore if doesn't exist
+  if (cleanupStorage) {
+    // Clean up stale storage from previous crashed CLI runs.
+    try {
+      rmSync('./storage', { recursive: true, force: true });
+    } catch {
+      // ignore if doesn't exist
+    }
   }
-
-  // Disable persistent storage — our data lives in PostgreSQL, no need for file-based request queues
-  Configuration.getGlobalConfig().set('persistStorage', false);
 
   const db = getDb();
   const startedAt = new Date().toISOString();
@@ -114,28 +166,29 @@ export async function runCrawl(options: CrawlOptions): Promise<void> {
   }).returning({ id: crawlRuns.id });
 
   const crawlRunId = crawlRun[0].id;
+  startCrawlMetrics(crawlRunId);
   log.info(`Crawl run #${crawlRunId} started`);
 
-  const crawler = createCrawler();
   const effectiveMaxPages = full ? 9999 : maxPages;
+  const tracksSeenListings = full && !detailOnly && !category && !subcategory;
 
   try {
     if (detailOnly) {
       // Only crawl detail pages for listings missing detail data
-      await crawlDetailOnly(crawler, crawlRunId, category, subcategory);
+      const crawler = createCrawler(persistCrawlerStorage);
+      await crawlDetailOnly(crawler, crawlRunId, syncDataset, category, subcategory);
     } else {
       // Normal crawl: list pages first, then details
       const categories = findCategory(category, subcategory);
 
       if (categories.length === 0) {
         log.error('No matching categories found', { category, subcategory });
-        return;
+        throw new Error(`No matching categories found for category=${category || 'all'} subcategory=${subcategory || 'all'}`);
       }
 
       log.info(`Crawling ${categories.length} categories, max ${effectiveMaxPages} pages each`);
 
-      // Enqueue first page of each category
-      const requests = categories.map((cat) => ({
+      const makeListRequest = (cat: CategoryConfig) => ({
         url: buildListUrl(cat, regionSlug, 1),
         label: 'LIST',
         userData: {
@@ -144,11 +197,26 @@ export async function runCrawl(options: CrawlOptions): Promise<void> {
           maxPages: effectiveMaxPages,
           crawlRunId,
           page: 1,
-          trackSeen: full && !detailOnly && !category && !subcategory,
+          trackSeen: tracksSeenListings,
+          crawlDetails,
+          syncDataset,
         },
-      }));
+      });
 
-      await crawler.run(requests);
+      if (categories.length > 1) {
+        for (const [index, cat] of categories.entries()) {
+          log.info(`Starting category pass: ${cat.label}`);
+          const categoryCrawler = createCrawler(persistCrawlerStorage);
+          await categoryCrawler.run([makeListRequest(cat)]);
+
+          if (config.crawler.betweenCategoryDelaySecs > 0 && index < categories.length - 1) {
+            await delay(config.crawler.betweenCategoryDelaySecs * 1000);
+          }
+        }
+      } else {
+        const crawler = createCrawler(persistCrawlerStorage);
+        await crawler.run(categories.map(makeListRequest));
+      }
     }
 
     // Update crawl run as completed
@@ -206,7 +274,8 @@ export async function runCrawl(options: CrawlOptions): Promise<void> {
     }
 
     // Count stats from DB
-    const stats = await getCrawlStats(db, crawlRunId, startedAt);
+    const runtimeMetrics = getCrawlMetrics(crawlRunId);
+    const stats = await getCrawlStats(db, crawlRunId, startedAt, runtimeMetrics, tracksSeenListings);
 
     await db.update(crawlRuns)
       .set({
@@ -218,6 +287,24 @@ export async function runCrawl(options: CrawlOptions): Promise<void> {
       .where(eq(crawlRuns.id, crawlRunId));
 
     log.info(`Crawl run #${crawlRunId} completed in ${durationSecs}s`, { ...stats, removedCount });
+
+    return {
+      crawlRunId,
+      type: crawlType,
+      startedAt,
+      finishedAt,
+      durationSecs,
+      category: category || null,
+      subcategory: subcategory || null,
+      regionSlug: regionSlug || null,
+      full,
+      detailOnly,
+      crawlDetails,
+      syncDataset,
+      removedCount,
+      stats,
+      runtimeMetrics: finishCrawlMetrics(crawlRunId),
+    };
   } catch (error) {
     const errMsg = (error as Error).message || String(error);
     log.error(`Crawl run #${crawlRunId} failed: ${errMsg}`);
@@ -225,9 +312,13 @@ export async function runCrawl(options: CrawlOptions): Promise<void> {
       .set({
         finishedAt: new Date().toISOString(),
         status: 'failed',
+        errors: getCrawlMetrics(crawlRunId).errors,
       })
       .where(eq(crawlRuns.id, crawlRunId));
+    finishCrawlMetrics(crawlRunId);
     throw error;
+  } finally {
+    await flushListingDatasetEvents(syncDataset);
   }
 }
 
@@ -237,6 +328,7 @@ export async function runCrawl(options: CrawlOptions): Promise<void> {
 async function crawlDetailOnly(
   crawler: CheerioCrawler,
   crawlRunId: number,
+  syncDataset: boolean,
   category?: string,
   subcategory?: string,
 ) {
@@ -275,7 +367,7 @@ async function crawlDetailOnly(
   const requests = filtered.map((l) => ({
     url: l.url,
     label: 'DETAIL',
-    userData: { adId: l.adId, crawlRunId },
+    userData: { adId: l.adId, crawlRunId, syncDataset },
   }));
 
   await crawler.run(requests);
@@ -284,13 +376,14 @@ async function crawlDetailOnly(
 /**
  * Get stats for a completed crawl run.
  */
-async function getCrawlStats(db: ReturnType<typeof getDb>, crawlRunId: number, startedAt: string) {
+async function getCrawlStats(
+  db: ReturnType<typeof getDb>,
+  crawlRunId: number,
+  startedAt: string,
+  runtimeMetrics: CrawlRuntimeMetrics,
+  tracksSeenListings: boolean,
+) {
   const { sql } = await import('drizzle-orm');
-
-  const [totalResult] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(listings)
-    ;
 
   const [newResult] = await db
     .select({ count: sql<number>`count(*)` })
@@ -304,9 +397,22 @@ async function getCrawlStats(db: ReturnType<typeof getDb>, crawlRunId: number, s
     .where(sql`${listings.updatedAt} >= ${startedAt} AND ${listings.detailCrawled} = true`)
     ;
 
+  let listingsFound = runtimeMetrics.listingsFound;
+  if (tracksSeenListings) {
+    const [seenResult] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(crawlSeenListings)
+      .where(eq(crawlSeenListings.crawlRunId, crawlRunId));
+
+    listingsFound = Number(seenResult?.count || listingsFound);
+  }
+
   return {
-    listingsFound: totalResult?.count || 0,
-    listingsNew: newResult?.count || 0,
-    detailsCrawled: detailResult?.count || 0,
+    pagesProcessed: runtimeMetrics.pagesProcessed,
+    listingsFound,
+    listingsNew: Number(newResult?.count || runtimeMetrics.listingsNew),
+    listingsUpdated: runtimeMetrics.listingsUpdated,
+    detailsCrawled: Number(detailResult?.count || runtimeMetrics.detailsCrawled),
+    errors: runtimeMetrics.errors,
   };
 }

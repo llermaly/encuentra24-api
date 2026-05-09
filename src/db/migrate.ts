@@ -1,5 +1,5 @@
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
-import { initDb, getDb } from './connection.js';
+import { closeDb, initDb, getDb } from './connection.js';
 
 async function runMigrations() {
   await initDb();
@@ -9,7 +9,11 @@ async function runMigrations() {
   console.log('Migrations complete.');
 }
 
-runMigrations().catch((err) => {
+try {
+  await runMigrations();
+} catch (err) {
   console.error('Migration failed:', err);
-  process.exit(1);
-});
+  process.exitCode = 1;
+} finally {
+  await closeDb();
+}
