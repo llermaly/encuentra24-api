@@ -216,7 +216,7 @@ async function sendDigestToRecipient(
       {
         send: () => sendEvoTextMessage(
           recipient.destination,
-          renderWhatsappDigestIntroMessage(digest, cadence, cardLimit)
+          renderWhatsappDigestIntroMessage(digest, cadence, cardLimit, recipient.label)
         ),
       },
       ...cards.map(card => ({

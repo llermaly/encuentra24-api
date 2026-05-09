@@ -67,13 +67,16 @@ export function getWhatsappDigestCards(
 export function renderWhatsappDigestIntroMessage(
   digest: DailySummaryDigest,
   cadence: SummaryCadence,
-  cardLimit = Number.POSITIVE_INFINITY
+  cardLimit = Number.POSITIVE_INFINITY,
+  greetingName?: string | null
 ) {
   const totalListings = getTotalListings(digest);
   const label = cadenceLabel(cadence);
+  const greeting = greetingName?.trim() ? [`Hi ${greetingName.trim()},`, ''] : [];
 
   if (totalListings === 0) {
     return [
+      ...greeting,
       `Encuentra24 ${label} summary`,
       `${formatDate(digest.periodStart)} to ${formatDate(digest.periodEnd)}`,
       '',
@@ -86,6 +89,7 @@ export function renderWhatsappDigestIntroMessage(
   const shownCount = Math.min(totalListings, cardLimit);
 
   return [
+    ...greeting,
     `Encuentra24 ${label} summary`,
     `${formatDate(digest.periodStart)} to ${formatDate(digest.periodEnd)}`,
     '',
