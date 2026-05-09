@@ -43,6 +43,16 @@ Crawlee migration database:
 - Last seed: production restore on 2026-05-09. Matching post-restore counts: `listings` 101062, `price_history` 18038, `sellers` 1542, `crawl_runs` 1389, `crawl_errors` 3284, `crawl_seen_listings` 86320.
 - Smoke: actor-style incremental `new_project/proyectos-nuevos` run `1390` completed with 1 page, 4 listings found, 0 errors.
 
+Crawlee Cloud platform:
+- Name: `encuentra24-crawlee-cloud`
+- UUID: `bdvayjem0bz9pes8fmt5rc19`
+- Type: custom Docker Compose service
+- Domains: `https://crawlee.llermaly.com`, `https://crawlee-dashboard.llermaly.com`
+- Components: API, dashboard, runner, scheduler, Postgres, Redis, MinIO
+- Source: `crawlee-cloud/crawlee-cloud` pinned to commit `8b40c8d8371a431cbcfe785c632091981bbc5328`
+- Status as of 2026-05-09: stopped. Initial start made the Coolify panel/API intermittently unavailable; service was stopped and the panel recovered.
+- Notes: upstream API enables PostgreSQL SSL automatically when `NODE_ENV=production`, which fails against the bundled local Postgres. The stopped service definition uses a startup command workaround for the API migration/start path and patches the runner container at runtime to skip its broad Docker cleanup calls. Do not restart without a controlled maintenance window and live monitoring.
+
 Vercel project:
 - Name: `encuentra24-api`
 - Project ID: `prj_LccjoDXiORVjhSM2fWo5eUXtskQg`
