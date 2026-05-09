@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { WhatsappRecipientsPanel } from '@/components/notifications/WhatsappRecipientsPanel';
 import { formatDate, formatPrice, formatRelativeDate } from '@/lib/formatters';
+import { renderWhatsappDigestMessages } from '@/lib/notifications/whatsapp-summary';
 
 interface DigestListing {
   itemId: number;
@@ -210,6 +211,10 @@ export default function DailySummaryPreviewPage() {
     () => digest.savedSearches.reduce((sum, group) => sum + group.listings.length, 0),
     [digest]
   );
+  const whatsappMessages = useMemo(
+    () => renderWhatsappDigestMessages(digest, cadence),
+    [digest, cadence]
+  );
 
   return (
     <div className="px-6 md:px-10 py-8 max-w-[1400px] mx-auto">
@@ -386,6 +391,38 @@ export default function DailySummaryPreviewPage() {
 
               <div className="px-6 py-5 bg-stone-950 text-stone-300 text-xs">
                 You are receiving this because you saved searches in Encuentra24 Property Desk.
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-stone-200 bg-[#f7f8f4] px-5 sm:px-8 py-7">
+            <div className="max-w-[720px] mx-auto">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.28em] text-stone-500 font-medium">
+                    Exact WhatsApp text
+                  </p>
+                  <h2 className="font-serif text-2xl text-stone-950 mt-1">
+                    Evo message payload
+                  </h2>
+                </div>
+                <span className="aurora-chip aurora-chip-slate">
+                  {whatsappMessages.length} {whatsappMessages.length === 1 ? 'message' : 'messages'}
+                </span>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {whatsappMessages.map((message, index) => (
+                  <div key={index} className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
+                    <div className="flex items-center justify-between gap-3 border-b border-stone-200 px-4 py-2">
+                      <p className="text-xs font-medium text-stone-600">Message {index + 1}</p>
+                      <span className="text-[11px] text-stone-400">{message.length} chars</span>
+                    </div>
+                    <pre className="whitespace-pre-wrap break-words px-4 py-4 text-[12px] leading-relaxed text-stone-800 font-mono">
+                      {message}
+                    </pre>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
