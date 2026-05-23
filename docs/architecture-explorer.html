@@ -1,0 +1,1755 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Encuentra24 Architecture Explorer</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f1ea;
+      --surface: #fffdf7;
+      --surface-2: #ece7dc;
+      --ink: #211f1a;
+      --muted: #69645b;
+      --line: #d8d0c2;
+      --accent: #276a5a;
+      --accent-2: #8a5a24;
+      --warn: #a23d35;
+      --blue: #315d87;
+      --shadow: 0 24px 60px rgba(32, 27, 18, 0.10);
+      --radius: 8px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      background:
+        linear-gradient(90deg, rgba(39, 106, 90, 0.08) 0 1px, transparent 1px),
+        linear-gradient(180deg, rgba(39, 106, 90, 0.06) 0 1px, transparent 1px),
+        var(--bg);
+      background-size: 48px 48px;
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.45;
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    .app-shell {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 284px minmax(0, 1fr);
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      padding: 24px 18px;
+      background: rgba(255, 253, 247, 0.94);
+      border-right: 1px solid var(--line);
+      backdrop-filter: blur(14px);
+      overflow-y: auto;
+    }
+
+    .brand {
+      display: grid;
+      gap: 6px;
+      margin-bottom: 26px;
+    }
+
+    .brand-mark {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: var(--ink);
+      color: var(--surface);
+      font-weight: 800;
+      letter-spacing: 0;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 19px;
+      line-height: 1.1;
+      letter-spacing: 0;
+    }
+
+    .brand p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .nav {
+      display: grid;
+      gap: 6px;
+      margin-bottom: 22px;
+    }
+
+    .nav button {
+      width: 100%;
+      border: 0;
+      border-radius: var(--radius);
+      padding: 10px 12px;
+      background: transparent;
+      color: var(--muted);
+      display: grid;
+      grid-template-columns: 22px 1fr;
+      gap: 10px;
+      align-items: center;
+      text-align: left;
+      transition: background 160ms ease, color 160ms ease, transform 160ms ease;
+    }
+
+    .nav button:hover,
+    .nav button.active {
+      background: var(--surface-2);
+      color: var(--ink);
+      transform: translateX(2px);
+    }
+
+    .nav .icon {
+      width: 22px;
+      height: 22px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .side-note {
+      border-top: 1px solid var(--line);
+      padding-top: 18px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .side-note strong {
+      color: var(--ink);
+    }
+
+    main {
+      min-width: 0;
+      padding: 28px;
+    }
+
+    .topbar {
+      max-width: 1320px;
+      margin: 0 auto 22px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 18px;
+      align-items: end;
+    }
+
+    .eyebrow {
+      margin: 0 0 6px;
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .topbar h2 {
+      margin: 0;
+      font-size: clamp(28px, 4vw, 54px);
+      line-height: 0.96;
+      letter-spacing: 0;
+      max-width: 860px;
+    }
+
+    .topbar p {
+      margin: 12px 0 0;
+      color: var(--muted);
+      max-width: 770px;
+    }
+
+    .meta-strip {
+      display: grid;
+      gap: 7px;
+      min-width: 220px;
+      padding: 14px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .meta-strip span {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .meta-strip b {
+      color: var(--ink);
+    }
+
+    .section {
+      display: none;
+      max-width: 1320px;
+      margin: 0 auto;
+      animation: enter 220ms ease;
+    }
+
+    .section.active {
+      display: block;
+    }
+
+    @keyframes enter {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .workspace {
+      display: grid;
+      gap: 18px;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .stat {
+      min-height: 104px;
+      padding: 16px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+    }
+
+    .stat strong {
+      display: block;
+      font-size: 34px;
+      line-height: 1;
+      margin-bottom: 8px;
+      letter-spacing: 0;
+    }
+
+    .stat span {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .panel {
+      background: rgba(255, 253, 247, 0.94);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .panel-header {
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .panel-header h3 {
+      margin: 0;
+      font-size: 16px;
+      letter-spacing: 0;
+    }
+
+    .panel-header p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .panel-body {
+      padding: 18px;
+    }
+
+    .system-map {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(330px, 0.8fr);
+      gap: 18px;
+    }
+
+    .node-grid {
+      min-height: 560px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      align-content: start;
+    }
+
+    .node {
+      position: relative;
+      min-height: 128px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--ink);
+      text-align: left;
+      transition: border-color 160ms ease, transform 160ms ease, background 160ms ease;
+    }
+
+    .node:hover,
+    .node.active {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+      background: #f8fff9;
+    }
+
+    .node .kind {
+      display: inline-flex;
+      margin-bottom: 12px;
+      padding: 3px 7px;
+      border-radius: 999px;
+      background: var(--surface-2);
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .node h4 {
+      margin: 0 0 8px;
+      font-size: 15px;
+    }
+
+    .node p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .detail {
+      position: sticky;
+      top: 22px;
+      align-self: start;
+    }
+
+    .detail h3 {
+      margin: 0 0 10px;
+      font-size: 24px;
+      line-height: 1.08;
+      letter-spacing: 0;
+    }
+
+    .detail p {
+      color: var(--muted);
+    }
+
+    .kv {
+      display: grid;
+      gap: 8px;
+      margin: 18px 0;
+    }
+
+    .kv div {
+      display: grid;
+      grid-template-columns: 90px 1fr;
+      gap: 10px;
+      padding: 9px 0;
+      border-bottom: 1px solid var(--line);
+      font-size: 13px;
+    }
+
+    .kv span:first-child {
+      color: var(--muted);
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 4px 9px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--surface);
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .chip.hot {
+      border-color: rgba(39, 106, 90, 0.28);
+      background: rgba(39, 106, 90, 0.10);
+      color: var(--accent);
+    }
+
+    .flow-tabs,
+    .filter-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .segmented {
+      border: 1px solid var(--line);
+      background: var(--surface);
+      color: var(--muted);
+      border-radius: 999px;
+      min-height: 36px;
+      padding: 7px 12px;
+      transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+    }
+
+    .segmented.active,
+    .segmented:hover {
+      color: var(--surface);
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .flow-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 0.95fr) minmax(320px, 0.55fr);
+      gap: 18px;
+    }
+
+    .flow-steps {
+      display: grid;
+      gap: 12px;
+    }
+
+    .step {
+      display: grid;
+      grid-template-columns: 42px 1fr;
+      gap: 12px;
+      align-items: start;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+    }
+
+    .step-number {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--ink);
+      color: var(--surface);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .step h4 {
+      margin: 0 0 6px;
+      font-size: 15px;
+    }
+
+    .step p {
+      margin: 0 0 10px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .callout {
+      padding: 16px;
+      border-left: 4px solid var(--accent-2);
+      background: #fff8ea;
+      border-radius: var(--radius);
+      color: var(--muted);
+    }
+
+    .callout strong {
+      color: var(--ink);
+    }
+
+    .schema-layout {
+      display: grid;
+      grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+      gap: 18px;
+    }
+
+    .controls {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .search-field,
+    .select-field {
+      width: 100%;
+      min-height: 40px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--ink);
+      padding: 9px 11px;
+    }
+
+    .table-list {
+      display: grid;
+      gap: 8px;
+      max-height: 640px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .table-row {
+      display: grid;
+      gap: 4px;
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      padding: 12px;
+      text-align: left;
+      color: var(--ink);
+      transition: border-color 160ms ease, background 160ms ease;
+    }
+
+    .table-row:hover,
+    .table-row.active {
+      border-color: var(--accent);
+      background: #f8fff9;
+    }
+
+    .table-row strong {
+      font-size: 14px;
+    }
+
+    .table-row span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .schema-detail h3 {
+      margin: 0;
+      font-size: 26px;
+      letter-spacing: 0;
+    }
+
+    .schema-summary {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin: 16px 0;
+    }
+
+    .mini-stat {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 11px;
+      background: var(--surface);
+    }
+
+    .mini-stat b {
+      display: block;
+      font-size: 20px;
+    }
+
+    .mini-stat span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .field-groups {
+      display: grid;
+      gap: 14px;
+    }
+
+    .field-group {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: var(--surface);
+    }
+
+    .field-group h4 {
+      margin: 0;
+      padding: 11px 12px;
+      background: var(--surface-2);
+      border-bottom: 1px solid var(--line);
+      font-size: 13px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .field {
+      display: grid;
+      grid-template-columns: minmax(160px, 0.8fr) minmax(130px, 0.55fr) minmax(0, 1fr);
+      gap: 12px;
+      padding: 9px 12px;
+      border-bottom: 1px solid var(--line);
+      font-size: 13px;
+    }
+
+    .field:last-child {
+      border-bottom: 0;
+    }
+
+    .field code,
+    .code {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+      color: var(--blue);
+    }
+
+    .field span {
+      color: var(--muted);
+    }
+
+    .index-list,
+    .route-grid,
+    .code-map,
+    .risk-grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    .index-list {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .index-item,
+    .route-card,
+    .map-item,
+    .risk-item {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      padding: 14px;
+    }
+
+    .index-item {
+      min-height: 48px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .route-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .route-card {
+      display: grid;
+      gap: 10px;
+    }
+
+    .route-card h4,
+    .map-item h4,
+    .risk-item h4 {
+      margin: 0;
+      font-size: 15px;
+    }
+
+    .route-card p,
+    .map-item p,
+    .risk-item p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .method-list {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .method {
+      padding: 3px 7px;
+      border-radius: 5px;
+      background: var(--ink);
+      color: var(--surface);
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .method.write {
+      background: var(--accent-2);
+    }
+
+    .method.cron {
+      background: var(--blue);
+    }
+
+    .code-map {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .map-item {
+      min-height: 172px;
+    }
+
+    .file-list {
+      display: grid;
+      gap: 6px;
+      margin-top: 12px;
+    }
+
+    .file-list code {
+      display: block;
+      padding: 7px 8px;
+      border-radius: 6px;
+      background: var(--surface-2);
+      color: var(--blue);
+      overflow-wrap: anywhere;
+    }
+
+    .risk-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .risk-item.warn {
+      border-color: rgba(162, 61, 53, 0.38);
+      background: #fff6f4;
+    }
+
+    .risk-item.good {
+      border-color: rgba(39, 106, 90, 0.32);
+      background: #f6fff8;
+    }
+
+    .empty-state {
+      padding: 30px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    @media (max-width: 1060px) {
+      .app-shell {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        position: static;
+        height: auto;
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .nav {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .topbar,
+      .system-map,
+      .flow-layout,
+      .schema-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .detail {
+        position: static;
+      }
+
+      .stat-grid,
+      .code-map,
+      .risk-grid,
+      .route-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 720px) {
+      main {
+        padding: 18px;
+      }
+
+      .nav,
+      .stat-grid,
+      .node-grid,
+      .schema-summary,
+      .index-list,
+      .code-map,
+      .risk-grid,
+      .route-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .topbar {
+        align-items: stretch;
+      }
+
+      .field {
+        grid-template-columns: 1fr;
+        gap: 4px;
+      }
+
+      .kv div {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">E24</div>
+        <h1>Architecture Explorer</h1>
+        <p>Current project map for the crawler, dashboard, schemas, and operational boundaries.</p>
+      </div>
+
+      <nav class="nav" aria-label="Explorer sections">
+        <button class="active" data-section="overview"><span class="icon">01</span><span>System Map</span></button>
+        <button data-section="flows"><span class="icon">02</span><span>Data Flows</span></button>
+        <button data-section="schema"><span class="icon">03</span><span>Schema</span></button>
+        <button data-section="apis"><span class="icon">04</span><span>API Surface</span></button>
+        <button data-section="codemap"><span class="icon">05</span><span>Code Map</span></button>
+        <button data-section="notes"><span class="icon">06</span><span>Pressure Points</span></button>
+      </nav>
+
+      <div class="side-note">
+        <p><strong>Generated from local files.</strong> This is a static explorer. It does not call the database, the crawler, Vercel, or Coolify.</p>
+        <p>Open directly in a browser: <span class="code">docs/architecture-explorer.html</span></p>
+      </div>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Production Project Reference</p>
+          <h2>Encuentra24 crawler plus dashboard, distilled into one working map.</h2>
+          <p>The project has two runtimes that share one PostgreSQL schema: a root crawler/CLI/actor that writes crawled data, and a Next.js app that authenticates users, reads market data, and writes user-scoped workflow data.</p>
+        </div>
+        <div class="meta-strip" aria-label="Project facts">
+          <span><b>Tables</b> 14</span>
+          <span><b>API route files</b> 22</span>
+          <span><b>Listing categories</b> 4</span>
+          <span><b>Schema copies</b> 2</span>
+        </div>
+      </header>
+
+      <section id="overview" class="section active">
+        <div class="workspace">
+          <div class="stat-grid">
+            <div class="stat"><strong>2</strong><span>Main runtimes: root crawler/actor and Next.js web app.</span></div>
+            <div class="stat"><strong>24</strong><span>Crawl category configs across sale, rental, vacation, and new_project.</span></div>
+            <div class="stat"><strong>6</strong><span>Crawler-owned tables for listings, runs, sellers, price history, seen rows, and errors.</span></div>
+            <div class="stat"><strong>8</strong><span>Web-owned user/workflow and notification tables.</span></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <h3>Clickable System Map</h3>
+                <p>Select a node to see ownership, files, and what it reads or writes.</p>
+              </div>
+            </div>
+            <div class="panel-body">
+              <div class="system-map">
+                <div id="nodeGrid" class="node-grid"></div>
+                <aside class="panel detail" id="nodeDetail"></aside>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="flows" class="section">
+        <div class="workspace">
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <h3>Data Flow Explorer</h3>
+                <p>Trace how data enters the system, how users browse it, and where notifications branch off.</p>
+              </div>
+              <div class="flow-tabs" id="flowTabs"></div>
+            </div>
+            <div class="panel-body">
+              <div class="flow-layout">
+                <div id="flowSteps" class="flow-steps"></div>
+                <aside class="callout" id="flowCallout"></aside>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="schema" class="section">
+        <div class="workspace">
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <h3>Schema Explorer</h3>
+                <p>The schemas are defined twice, in <span class="code">src/db/schema.ts</span> and <span class="code">web/src/db/schema.ts</span>.</p>
+              </div>
+            </div>
+            <div class="panel-body">
+              <div class="schema-layout">
+                <aside>
+                  <div class="controls">
+                    <input id="schemaSearch" class="search-field" type="search" placeholder="Search tables, columns, indexes">
+                    <div class="filter-row" id="schemaFilters"></div>
+                  </div>
+                  <div id="tableList" class="table-list"></div>
+                </aside>
+                <article id="schemaDetail" class="schema-detail"></article>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="apis" class="section">
+        <div class="workspace">
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <h3>API Route Matrix</h3>
+                <p>Routes are shaped directly for dashboard pages and React Query consumers.</p>
+              </div>
+              <div class="filter-row">
+                <input id="apiSearch" class="search-field" type="search" placeholder="Search route, consumer, table">
+                <select id="apiTableFilter" class="select-field" aria-label="Filter APIs by table">
+                  <option value="">All tables</option>
+                </select>
+              </div>
+            </div>
+            <div class="panel-body">
+              <div id="apiGrid" class="route-grid"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="codemap" class="section">
+        <div class="workspace">
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <h3>Code Map</h3>
+                <p>Use this as the first-pass orientation before changing a feature.</p>
+              </div>
+            </div>
+            <div class="panel-body">
+              <div id="codeMap" class="code-map"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="notes" class="section">
+        <div class="workspace">
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <h3>Architecture Pressure Points</h3>
+                <p>These are not all bugs. They are the places to slow down before a change.</p>
+              </div>
+            </div>
+            <div class="panel-body">
+              <div id="riskGrid" class="risk-grid"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const systemNodes = [
+      {
+        id: "source-site",
+        label: "Encuentra24 Website",
+        kind: "external",
+        role: "Source pages for Panama real-estate listings across sale, rental, vacation, and new_project categories.",
+        owner: "External site",
+        files: ["src/crawler/categories.ts", "src/crawler/utils/url.ts"],
+        reads: [],
+        writes: [],
+        notes: ["Base URL: https://www.encuentra24.com/panama-es", "Category slug validation protects against redirected or wrong-category pages."]
+      },
+      {
+        id: "cli",
+        label: "Root CLI",
+        kind: "runtime",
+        role: "Commander.js entrypoint for crawl, status, export, sellers, probe-site, ph, and backfill-removed workflows.",
+        owner: "Root TypeScript app",
+        files: ["src/index.ts", "src/cli/commands/crawl.ts", "src/cli/commands/sellers.ts", "src/cli/commands/ph.ts"],
+        reads: ["listings", "crawl_runs", "sellers"],
+        writes: ["listings", "crawl_runs", "crawl_errors", "sellers", "price_history"],
+        notes: ["Runs from repo root with npm run dev or compiled e24 binary.", "Shares the same Drizzle schema as the web app."]
+      },
+      {
+        id: "actor",
+        label: "Apify/Crawlee Actor",
+        kind: "runtime",
+        role: "Cloud-compatible wrapper around runCrawl with zod input validation and optional dataset event sync.",
+        owner: "Root TypeScript app",
+        files: ["src/actor/encuentra24.ts", ".actor/actor.json", ".actor/input_schema.json"],
+        reads: ["actor input", "DATABASE_URL"],
+        writes: ["PostgreSQL", "Apify dataset output"],
+        notes: ["Defaults syncDataset to true for incremental mode.", "Writes OUTPUT and pushData summaries for actor runs."]
+      },
+      {
+        id: "crawler",
+        label: "CheerioCrawler Pipeline",
+        kind: "worker",
+        role: "Creates crawl_runs, crawls list pages, enqueues detail pages, records runtime metrics, and marks missing listings removed during guarded full crawls.",
+        owner: "src/crawler/index.ts",
+        files: ["src/crawler/index.ts", "src/crawler/router.ts", "src/crawler/metrics.ts", "src/crawler/dataset-sync.ts"],
+        reads: ["listings", "crawl_seen_listings", "category configs"],
+        writes: ["listings", "crawl_runs", "crawl_errors", "crawl_seen_listings", "price_history"],
+        notes: ["Full-crawl removal has a safety check before marking unseen active listings removed.", "Incremental crawls sort by newest listings first."]
+      },
+      {
+        id: "extractors",
+        label: "Extractors",
+        kind: "parser",
+        role: "Extract listing cards, GA4 data, JSON-LD, Loopa data, Next Flight payloads, HTML fields, media, amenities, coordinates, and detail attributes.",
+        owner: "Crawler",
+        files: ["src/crawler/extractors/list-page.ts", "src/crawler/extractors/detail-page.ts", "src/crawler/extractors/html-fields.ts", "src/crawler/extractors/next-flight.ts"],
+        reads: ["HTML", "embedded JSON"],
+        writes: ["Listing card objects", "DetailData objects"],
+        notes: ["List pages seed core fields.", "Detail pages enrich records and update removal checks."]
+      },
+      {
+        id: "postgres",
+        label: "PostgreSQL",
+        kind: "database",
+        role: "Shared source of truth for crawler output, user workspace state, saved searches, notification digests, and delivery records.",
+        owner: "Production database",
+        files: ["src/db/schema.ts", "web/src/db/schema.ts", "drizzle/*.sql", "migrations/*.sql"],
+        reads: ["Next.js API routes", "CLI status/export/report commands"],
+        writes: ["Crawler", "Web app user actions", "Notification scheduler"],
+        notes: ["Do not use db:push against production.", "Logical relationships are mostly enforced by code and unique indexes, not explicit foreign keys."]
+      },
+      {
+        id: "web-api",
+        label: "Next API Routes",
+        kind: "service",
+        role: "Auth-gated route handlers for listings, dashboard aggregations, agents, favorites, pipeline, saved searches, crawl history, and notifications.",
+        owner: "web/src/app/api",
+        files: ["web/src/app/api/listings/route.ts", "web/src/app/api/dashboard/route.ts", "web/src/app/api/agents/route.ts", "web/src/app/api/notifications/daily-summary/route.ts"],
+        reads: ["listings", "crawl_runs", "price_history", "sellers", "saved_searches"],
+        writes: ["favorites", "pipeline_items", "property_notes", "saved_searches", "notification_*"],
+        notes: ["Most routes call requireUser().", "Aggregation routes use raw SQL via db.all() where Drizzle query builder would be awkward."]
+      },
+      {
+        id: "web-ui",
+        label: "Next App UI",
+        kind: "client",
+        role: "Authenticated dashboard with React Query, Tailwind CSS 4, Leaflet maps, Recharts, and Stack auth.",
+        owner: "web/src/app/(app)",
+        files: ["web/src/app/(app)/page.tsx", "web/src/app/(app)/listings/page.tsx", "web/src/app/(app)/map/page.tsx", "web/src/components/layout/Sidebar.tsx"],
+        reads: ["/api/listings", "/api/dashboard", "/api/categories", "/api/agents"],
+        writes: ["/api/favorites", "/api/pipeline", "/api/saved-searches", "/api/notifications/recipients"],
+        notes: ["React Query cache keys mirror route concerns.", "App layout redirects unauthenticated users through Stack."]
+      },
+      {
+        id: "auth",
+        label: "Stack Auth",
+        kind: "auth",
+        role: "Server and client user boundary for the dashboard and most API routes.",
+        owner: "web/src/stack.ts",
+        files: ["web/src/lib/auth.ts", "web/src/stack.ts", "web/src/app/handler/[...stack]/page.tsx"],
+        reads: ["Stack cookies/session"],
+        writes: ["userId scoped app rows"],
+        notes: ["requireUser() is the route-level guard.", "User-scoped tables include user_id columns and per-user unique indexes."]
+      },
+      {
+        id: "notifications",
+        label: "Notification Scheduler",
+        kind: "service",
+        role: "Captures new saved-search matches into digest tables and sends WhatsApp summaries through Evo API.",
+        owner: "web/src/lib/notifications",
+        files: ["web/src/lib/notifications/daily-summary.ts", "web/src/lib/notifications/scheduler.ts", "web/src/lib/notifications/evo.ts", "web/src/app/api/cron/notifications/daily/route.ts"],
+        reads: ["saved_searches", "listings", "notification_recipients"],
+        writes: ["notification_digest_runs", "notification_digest_items", "notification_deliveries"],
+        notes: ["Cron routes require CRON_SECRET bearer auth.", "Deliveries store provider message IDs and can resume partially sent batches."]
+      },
+      {
+        id: "ph",
+        label: "P.H. Registry Analyzer",
+        kind: "tooling",
+        role: "Human-in-the-loop extractor for P.H. building names from listing title and description text.",
+        owner: "Root CLI",
+        files: ["src/ph/detector.ts", "src/cli/commands/ph.ts", "config/ph-registry/registry.csv", "config/ph-registry/aliases.csv", "config/ph-registry/ignore.txt"],
+        reads: ["listings.title", "listings.description", "registry.csv", "aliases.csv", "ignore.txt"],
+        writes: ["local reports under data/ph-registry/reports"],
+        notes: ["Current workflow writes review reports, not schema columns.", "Uses marker extraction, normalization, alias matching, ignore lists, and review thresholds."]
+      },
+      {
+        id: "infra",
+        label: "Stage/Prod Boundaries",
+        kind: "ops",
+        role: "Vercel hosts the web app; Coolify hosts PostgreSQL resources for production, staging, and Crawlee migration validation.",
+        owner: "Operational inventory",
+        files: ["AGENTS.md", "docs/inventory/services.md", "docs/crawlee-cloud.md"],
+        reads: ["Vercel env vars", "Coolify databases"],
+        writes: ["Deployments", "database migrations"],
+        notes: ["main maps to production and stage maps to staging.", "Staging and Crawlee migration databases are disposable only after explicit confirmation."]
+      }
+    ];
+
+    const flows = {
+      crawl: {
+        label: "Crawler Run",
+        callout: "<strong>Owner:</strong> root runtime. The crawler owns market data writes. The web app treats crawler tables as read-mostly except crawl-live cancellation metadata.",
+        steps: [
+          ["CLI or Actor input", "src/index.ts or src/actor/encuentra24.ts validates options such as mode, category, subcategory, maxPages, and crawlDetails.", ["src/index.ts", "src/actor/encuentra24.ts"]],
+          ["Create crawl run", "runCrawl() initializes the database, creates a running crawl_runs row, and starts in-memory metrics.", ["src/crawler/index.ts", "crawl_runs"]],
+          ["Build list requests", "findCategory() and buildListUrl() fan out across 24 configured category slugs, optionally scoped by regionSlug.", ["src/crawler/categories.ts"]],
+          ["Parse list pages", "LIST handler extracts cards and GA4 data, validates category slugs, inserts new listings, updates price changes, records crawl_seen_listings for full crawls, and enqueues details.", ["src/crawler/router.ts", "listings", "price_history"]],
+          ["Parse details", "DETAIL handler detects redirects/removals, extracts richer page data, updates listings, and records old prices when present.", ["src/crawler/extractors/detail-page.ts", "listings"]],
+          ["Finish and summarize", "The crawl writes final stats to crawl_runs, flushes optional dataset events, and marks unseen listings removed only in guarded full-crawl mode.", ["crawl_runs", "crawl_seen_listings", "src/crawler/dataset-sync.ts"]]
+        ]
+      },
+      browse: {
+        label: "Browse Listings",
+        callout: "<strong>Owner:</strong> web runtime. Listing search is server-side: filters, joins, ordering, pagination, and counts happen in SQL.",
+        steps: [
+          ["User enters app", "Authenticated pages live under web/src/app/(app), and the layout requires a Stack user before rendering the workspace.", ["web/src/app/(app)/layout.tsx"]],
+          ["React Query calls API", "Browse, favorites, and map pages call /api/listings with URLSearchParams derived from filters.", ["web/src/app/(app)/listings/page.tsx", "web/src/app/(app)/map/page.tsx"]],
+          ["Parse filters", "parseFiltersFromParams() normalizes query params into ListingFilters, defaulting listing route status to active.", ["web/src/types/filters.ts"]],
+          ["Build SQL", "buildListingWhere() adds category, price, room, area, location, coordinate, status, favorite, and pipeline conditions.", ["web/src/db/query-builder.ts"]],
+          ["Join user state", "/api/listings left joins favorites and pipeline_items for the current user and returns shaped rows plus pagination.", ["web/src/app/api/listings/route.ts"]],
+          ["Render cards/map", "ListingGrid, ListingCard, and MapView consume the API shape, while favorite and pipeline actions invalidate related React Query keys.", ["web/src/components/listings", "web/src/components/map"]]
+        ]
+      },
+      saved: {
+        label: "Saved Searches",
+        callout: "<strong>Key contract:</strong> saved_searches.filters is JSON text. It is converted back through the same ListingFilters parser before reuse.",
+        steps: [
+          ["Save filters", "SaveSearchModal posts the current filter object to /api/saved-searches, which stores JSON text scoped to userId.", ["web/src/components/saved-searches/SaveSearchModal.tsx", "saved_searches"]],
+          ["Dashboard previews", "/api/dashboard?tab=searches loads saved searches, rebuilds filters, and returns the latest 10 matching active listings for each saved search.", ["web/src/app/api/dashboard/route.ts"]],
+          ["Manual check", "/api/saved-searches/check-all counts new matches since lastCheckedAt and updates newMatchCount.", ["web/src/app/api/saved-searches/check-all/route.ts"]],
+          ["Notification capture", "captureSavedSearchDailySummary() reuses saved-search filters and inserts notification_digest_items for listings first seen in the capture window.", ["web/src/lib/notifications/daily-summary.ts"]],
+          ["User sees digest", "/api/notifications/daily-summary returns the latest digest grouped by saved search.", ["web/src/app/api/notifications/daily-summary/route.ts"]]
+        ]
+      },
+      notifications: {
+        label: "WhatsApp Digest",
+        callout: "<strong>Operational boundary:</strong> cron routes are not Stack-user routes. They require Authorization: Bearer CRON_SECRET.",
+        steps: [
+          ["Configure recipients", "Authenticated users add WhatsApp recipients via /api/notifications/recipients. Numbers are normalized and stored as active recipient rows.", ["notification_recipients", "web/src/lib/notifications/recipients.ts"]],
+          ["Cron trigger", "/api/cron/notifications/daily and weekly call a shared handler with a 300 second max duration.", ["web/src/app/api/cron/notifications/_shared.ts"]],
+          ["Group by user", "runScheduledWhatsappDigests() lists enabled recipients, groups them by userId, and builds one digest per user and cadence.", ["web/src/lib/notifications/scheduler.ts"]],
+          ["Create digest rows", "captureSavedSearchDailySummary() inserts or reuses a run by scheduleKey, then de-duplicates digest items by user, event type, adId, and eventAt.", ["notification_digest_runs", "notification_digest_items"]],
+          ["Send and track", "Each delivery gets a notification_deliveries row. Evo text/media sends update providerMessageId, status, sentAt, or errorMessage.", ["notification_deliveries", "web/src/lib/notifications/evo.ts"]]
+        ]
+      },
+      ph: {
+        label: "P.H. Review Loop",
+        callout: "<strong>Status:</strong> this is currently local analysis tooling. It does not yet add a normalized building field to listings.",
+        steps: [
+          ["Load catalog", "The detector loads registry.csv, aliases.csv, and ignore.txt into match targets.", ["src/ph/detector.ts", "config/ph-registry"]],
+          ["Scan listings", "ph analyze queries listing title and description, with optional category, subcategory, status, scan mode, and debug limit filters.", ["src/cli/commands/ph.ts", "listings"]],
+          ["Extract candidates", "The detector looks for P.H., edificio, condominio, residencial, torre, and trailing-title patterns, then normalizes and filters candidates.", ["src/ph/detector.ts"]],
+          ["Match or review", "Candidates match registry or alias targets by score; lower-confidence items become review/unmatched output.", ["registry.csv", "aliases.csv", "ignore.txt"]],
+          ["Curate feedback", "Humans add canonical names, aliases, or ignores, then rerun reports until noise is acceptable.", ["config/ph-registry/README.md"]]
+        ]
+      }
+    };
+
+    const schemas = [
+      {
+        table: "listings",
+        group: "crawler",
+        owner: "Crawler writes; web reads and joins user state",
+        purpose: "Canonical property listing record, seeded from list pages and enriched from detail pages.",
+        mutation: "Inserted/updated by LIST and DETAIL handlers; removal fields updated by detail redirect checks, 404s, backfill, and guarded full crawls.",
+        fields: {
+          Identity: [["id", "serial primary key", "Internal row id"], ["ad_id", "text unique not null", "Stable external listing key"], ["slug", "text", "URL slug"], ["url", "text not null", "Original listing URL"]],
+          Classification: [["category", "text not null", "sale, rental, vacation, new_project"], ["subcategory", "text not null", "Configured category sub-type"], ["housing_type", "text", "Detail-page housing type"]],
+          Pricing: [["price", "double precision", "Current price"], ["currency", "text default USD", "Currency code"], ["old_price", "double precision", "Previous/strikethrough price"], ["price_per_sqm_construction", "double precision", "Construction price per sqm"], ["price_per_sqm_land", "double precision", "Land price per sqm"]],
+          Location: [["province", "text", "Province"], ["city", "text", "City"], ["location", "text", "Neighborhood/locality"], ["address", "text", "Street address"], ["region_slug", "text", "Crawl region scope"], ["latitude", "double precision", "Map latitude"], ["longitude", "double precision", "Map longitude"]],
+          Specs: [["bedrooms", "integer", "Bedroom count"], ["bathrooms", "double precision", "Bathroom count"], ["parking", "integer", "Parking spaces"], ["built_area_sqm", "double precision", "Construction area"], ["land_area_sqm", "double precision", "Land area"], ["total_sqm", "double precision", "Total area"], ["year_built", "integer", "Construction year"], ["levels", "integer", "Levels"], ["floor_number", "integer", "Floor"], ["floor_type", "text", "Floor material/type"], ["ceiling_height", "double precision", "Ceiling height"], ["maintenance_cost", "double precision", "Maintenance fee"], ["title_status", "text", "Title status"]],
+          Media: [["images", "jsonb string[]", "Image URLs"], ["image_count", "integer default 0", "Image count"], ["has_video", "boolean", "Video marker"], ["has_vr", "boolean", "VR marker"]],
+          Seller: [["seller_id", "integer", "Logical sellers.id link"], ["seller_name", "text", "Agency/seller display name"], ["agent_name", "text", "Individual agent"], ["seller_type", "text", "Seller classification"], ["seller_verified", "boolean", "Verification marker"]],
+          Engagement: [["feature_level", "text", "Premium/featured marker"], ["discount_pct", "double precision", "Discount percentage"], ["favorites_count", "integer", "Encuentra24 favorite count"], ["amenities", "jsonb string[]", "Amenities"]],
+          Lifecycle: [["published_at", "text", "Site-published date"], ["first_seen_at", "text not null", "First crawl observation"], ["last_seen_at", "text not null", "Latest crawl observation"], ["removed_at", "text", "Removal marker"], ["updated_at", "text not null", "Latest local update"], ["removal_checked_at", "text", "Latest removal check"], ["detail_crawled", "boolean default false", "Detail enrichment status"], ["crawl_version", "integer default 1", "Extraction version"]],
+          Raw: [["raw_json_ld", "text", "Stored JSON-LD"], ["raw_loopa_data", "text", "Stored Loopa payload"], ["raw_retail_rocket", "text", "Stored RetailRocket payload"]]
+        },
+        indexes: ["ad_id unique", "idx_category", "idx_subcategory", "idx_price", "idx_bedrooms", "idx_location", "idx_province", "idx_city", "idx_last_seen", "idx_detail_crawled", "idx_built_area", "idx_land_area", "idx_year_built", "idx_category_subcategory", "idx_category_location", "idx_category_price", "idx_province_city", "idx_published_at", "idx_first_seen_at", "idx_removed_at", "idx_category_published", "idx_subcategory_published", "idx_listings_search_text_trgm"],
+        related: ["price_history.ad_id", "favorites.ad_id", "pipeline_items.ad_id", "property_notes.ad_id", "crawl_seen_listings.ad_id", "notification_digest_items.ad_id", "sellers.id/name"]
+      },
+      {
+        table: "price_history",
+        group: "crawler",
+        owner: "Crawler writes; listing detail page reads",
+        purpose: "Historical price snapshots when a crawled price changes or oldPrice is discovered.",
+        mutation: "LIST handler inserts previous price on price change; DETAIL handler inserts retail rocket old price when first seen.",
+        fields: { Main: [["id", "serial primary key", ""], ["ad_id", "text not null", "Listing key"], ["price", "double precision not null", "Historical price"], ["currency", "text default USD", ""], ["source", "text", "crawl or retail_rocket_old_price"], ["recorded_at", "text not null", "Capture time"]] },
+        indexes: ["idx_ph_ad_id", "idx_ph_recorded_at"],
+        related: ["listings.ad_id"]
+      },
+      {
+        table: "crawl_runs",
+        group: "crawler",
+        owner: "Crawler writes; web crawl-history reads; crawl-live can cancel running rows",
+        purpose: "One row per crawl execution with aggregate stats and status.",
+        mutation: "runCrawl inserts running, then updates completed/failed; /api/crawl-live POST can mark cancelled.",
+        fields: { Main: [["id", "serial primary key", ""], ["type", "text default incremental", "incremental or full"], ["started_at", "text not null", ""], ["finished_at", "text", ""], ["status", "text not null", "running, completed, failed, cancelled"], ["category", "text", "Optional scope"], ["subcategory", "text", "Optional scope"], ["region_slug", "text", "Optional scope"], ["pages_processed", "integer default 0", ""], ["listings_found", "integer default 0", ""], ["listings_new", "integer default 0", ""], ["listings_updated", "integer default 0", ""], ["details_crawled", "integer default 0", ""], ["errors", "integer default 0", ""], ["duration_secs", "integer", "Runtime"]] },
+        indexes: [],
+        related: ["crawl_errors.crawl_run_id", "crawl_seen_listings.crawl_run_id"]
+      },
+      {
+        table: "crawl_seen_listings",
+        group: "crawler",
+        owner: "Crawler writes during full, unscoped crawls",
+        purpose: "Join table that records which active listings were seen in a full crawl so unseen listings can be marked removed with a safety check.",
+        mutation: "LIST handler inserts (crawl_run_id, ad_id) when trackSeen is enabled.",
+        fields: { Main: [["crawl_run_id", "integer not null", "Logical crawl_runs.id"], ["ad_id", "text not null", "Listing key"], ["seen_at", "text not null", "Observation timestamp"]] },
+        indexes: ["primary key (crawl_run_id, ad_id)", "idx_csl_ad_id", "idx_csl_seen_at"],
+        related: ["crawl_runs.id", "listings.ad_id"]
+      },
+      {
+        table: "sellers",
+        group: "crawler",
+        owner: "Seller CLI writes; web reads contact metadata",
+        purpose: "Normalized seller/agency contact table derived from listing data and optional contact crawls.",
+        mutation: "sellers sync/crawl-contacts/scrape-whatsapp commands populate or enrich rows.",
+        fields: { Main: [["id", "serial primary key", ""], ["name", "text unique not null", "Seller/agency name"], ["type", "text", ""], ["verified", "boolean default false", ""], ["whatsapp", "text", "Contact number"], ["phone", "text", "Contact phone"], ["profile_url", "text", "Seller profile"], ["listing_count", "integer default 0", ""], ["sample_listing_url", "text", ""], ["first_seen_at", "text not null", ""], ["updated_at", "text not null", ""]] },
+        indexes: ["name unique", "idx_seller_name", "idx_seller_whatsapp"],
+        related: ["listings.seller_id", "listings.seller_name"]
+      },
+      {
+        table: "crawl_errors",
+        group: "crawler",
+        owner: "Crawler writes; crawl-history reads",
+        purpose: "Request failure log for crawl diagnostics.",
+        mutation: "CheerioCrawler failedRequestHandler inserts blocked/http_error/timeout rows.",
+        fields: { Main: [["id", "serial primary key", ""], ["crawl_run_id", "integer", "Logical crawl_runs.id"], ["url", "text not null", "Failed URL"], ["error_type", "text not null", "blocked, http_error, timeout"], ["status_code", "integer", "HTTP status"], ["message", "text", "Error message"], ["occurred_at", "text not null", "Timestamp"]] },
+        indexes: [],
+        related: ["crawl_runs.id"]
+      },
+      {
+        table: "favorites",
+        group: "user",
+        owner: "Web app writes",
+        purpose: "Per-user listing favorites.",
+        mutation: "/api/favorites POST inserts; /api/favorites/[adId] DELETE removes.",
+        fields: { Main: [["id", "serial primary key", ""], ["user_id", "text not null", "Stack user id"], ["ad_id", "text not null", "Listing key"], ["created_at", "text not null", ""]] },
+        indexes: ["unique idx_fav_user_ad (user_id, ad_id)", "idx_fav_user_id"],
+        related: ["listings.ad_id", "Stack user"]
+      },
+      {
+        table: "pipeline_items",
+        group: "user",
+        owner: "Web app writes",
+        purpose: "Per-user workflow board for tracked listings.",
+        mutation: "/api/pipeline POST inserts; /api/pipeline/[adId] PATCH moves stage/position; DELETE removes.",
+        fields: { Main: [["id", "serial primary key", ""], ["user_id", "text not null", ""], ["ad_id", "text not null", ""], ["stage", "text not null default discovered", "Pipeline column"], ["position", "integer not null default 0", "Sort order"], ["moved_at", "text not null", ""], ["created_at", "text not null", ""]] },
+        indexes: ["unique idx_pipe_user_ad (user_id, ad_id)", "idx_pipe_user_id", "idx_pipe_stage"],
+        related: ["listings.ad_id", "Stack user"]
+      },
+      {
+        table: "property_notes",
+        group: "user",
+        owner: "Web app writes",
+        purpose: "Per-user notes attached to listing detail pages.",
+        mutation: "/api/listings/[adId]/notes POST inserts; GET lists notes for the current user and listing.",
+        fields: { Main: [["id", "serial primary key", ""], ["user_id", "text not null", ""], ["ad_id", "text not null", ""], ["type", "text not null default note", ""], ["content", "text not null", ""], ["created_at", "text not null", ""]] },
+        indexes: ["idx_notes_user_ad", "idx_notes_user_id"],
+        related: ["listings.ad_id", "Stack user"]
+      },
+      {
+        table: "saved_searches",
+        group: "user",
+        owner: "Web app writes; notifications read",
+        purpose: "Named per-user listing filters stored as JSON text.",
+        mutation: "/api/saved-searches POST creates; PATCH updates; DELETE removes; check-all updates match counters.",
+        fields: { Main: [["id", "serial primary key", ""], ["user_id", "text not null", ""], ["name", "text not null", ""], ["filters", "text not null", "JSON-serialized ListingFilters"], ["last_checked_at", "text", ""], ["new_match_count", "integer default 0", ""], ["created_at", "text not null", ""], ["updated_at", "text not null", ""]] },
+        indexes: ["idx_ss_user_id"],
+        related: ["notification_digest_items.source_id", "Stack user"]
+      },
+      {
+        table: "notification_digest_runs",
+        group: "notifications",
+        owner: "Notification capture writes",
+        purpose: "One digest capture run per user/cadence/schedule window.",
+        mutation: "captureSavedSearchDailySummary inserts or reuses by user, kind, schedule_key; scheduler marks sent/failed.",
+        fields: { Main: [["id", "serial primary key", ""], ["user_id", "text not null", ""], ["kind", "text not null", "saved_search_daily or saved_search_weekly"], ["schedule_key", "text", "date or week key"], ["status", "text not null default pending", "pending, empty, sent, failed"], ["period_start", "text not null", ""], ["period_end", "text not null", ""], ["item_count", "integer not null default 0", ""], ["created_at", "text not null", ""], ["sent_at", "text", ""], ["error_message", "text", ""]] },
+        indexes: ["idx_digest_runs_user_kind_status", "unique idx_digest_runs_user_kind_schedule", "idx_digest_runs_created_at"],
+        related: ["notification_digest_items.digest_run_id", "notification_deliveries.digest_run_id"]
+      },
+      {
+        table: "notification_digest_items",
+        group: "notifications",
+        owner: "Notification capture writes",
+        purpose: "Individual listing events captured for a digest run.",
+        mutation: "Inserted in batches; unique event index prevents duplicate listing event rows.",
+        fields: { Main: [["id", "serial primary key", ""], ["digest_run_id", "integer not null", "Logical notification_digest_runs.id"], ["user_id", "text not null", ""], ["event_type", "text not null", "new_saved_search_match_daily/weekly"], ["source_type", "text not null", "saved_search"], ["source_id", "integer", "Logical saved_searches.id"], ["ad_id", "text not null", "Listing key"], ["event_at", "text not null", "Listing firstSeenAt"], ["captured_at", "text not null", "Capture time"]] },
+        indexes: ["idx_digest_items_run_id", "idx_digest_items_user_event", "unique idx_digest_items_unique_event (user_id, event_type, ad_id, event_at)"],
+        related: ["notification_digest_runs.id", "saved_searches.id", "listings.ad_id"]
+      },
+      {
+        table: "notification_recipients",
+        group: "notifications",
+        owner: "Web app writes; scheduler reads",
+        purpose: "Per-user WhatsApp destinations and cadence preferences.",
+        mutation: "Recipients route upserts, patches, and soft-deletes by setting active false.",
+        fields: { Main: [["id", "serial primary key", ""], ["user_id", "text not null", ""], ["channel", "text not null default whatsapp", ""], ["destination", "text not null", "Normalized number"], ["label", "text", ""], ["daily_enabled", "boolean not null default true", ""], ["weekly_enabled", "boolean not null default true", ""], ["active", "boolean not null default true", ""], ["created_at", "text not null", ""], ["updated_at", "text not null", ""]] },
+        indexes: ["idx_notification_recipients_user", "unique idx_notification_recipients_unique_destination (user_id, channel, destination)"],
+        related: ["notification_deliveries.recipient_id", "Stack user"]
+      },
+      {
+        table: "notification_deliveries",
+        group: "notifications",
+        owner: "Notification scheduler writes",
+        purpose: "Delivery attempt state for each digest recipient.",
+        mutation: "Scheduler creates queued rows, updates sending progress, stores provider IDs, and marks sent or failed.",
+        fields: { Main: [["id", "serial primary key", ""], ["digest_run_id", "integer not null", ""], ["recipient_id", "integer not null", ""], ["user_id", "text not null", ""], ["channel", "text not null", ""], ["destination", "text not null", ""], ["cadence", "text not null", "daily or weekly"], ["status", "text not null default queued", "queued, sending, sent, failed"], ["provider_message_id", "text", "Comma-separated Evo message ids"], ["error_message", "text", ""], ["created_at", "text not null", ""], ["sent_at", "text", ""]] },
+        indexes: ["idx_notification_deliveries_user", "idx_notification_deliveries_run", "unique idx_notification_deliveries_unique_recipient (digest_run_id, recipient_id)"],
+        related: ["notification_digest_runs.id", "notification_recipients.id"]
+      }
+    ];
+
+    const apiRoutes = [
+      { path: "/api/listings", methods: ["GET"], tables: ["listings", "favorites", "pipeline_items"], consumers: ["Browse", "Map", "Favorites filtered view"], notes: "Server-side filters, sorting, joins, pagination, and active default." },
+      { path: "/api/listings/[adId]", methods: ["GET"], tables: ["listings", "favorites", "pipeline_items", "price_history", "property_notes", "sellers"], consumers: ["Listing detail"], notes: "Returns detail row, price history, notes, pipeline state, favorite state, and seller WhatsApp when not placeholder." },
+      { path: "/api/listings/[adId]/notes", methods: ["GET", "POST"], tables: ["property_notes"], consumers: ["Listing detail"], notes: "User-scoped notes for one listing." },
+      { path: "/api/categories", methods: ["GET"], tables: ["listings"], consumers: ["Listing filters"], notes: "Facet route using GROUPING SETS for categories, provinces, cities, and locations." },
+      { path: "/api/dashboard", methods: ["GET"], tables: ["listings", "crawl_runs", "favorites", "saved_searches"], consumers: ["Dashboard", "Saved Searches"], notes: "tab=summary, market, or searches. Mixes Drizzle and raw aggregation SQL." },
+      { path: "/api/dashboard/trends", methods: ["GET"], tables: ["listings", "crawl_runs"], consumers: ["Dashboard charts"], notes: "30-day added/removed trends, top cities, recent crawls, sale price buckets, category share." },
+      { path: "/api/agents", methods: ["GET"], tables: ["listings", "sellers"], consumers: ["Agents leaderboard"], notes: "Agency and individual agent leaderboards with search, location filter, sort, and pagination." },
+      { path: "/api/agents/[name]", methods: ["GET"], tables: ["listings", "sellers"], consumers: ["Agent report"], notes: "Heavy report route with metrics, portfolio splits, market comparisons, map listings, quality score, competitors, and paginated listings." },
+      { path: "/api/crawl-history", methods: ["GET"], tables: ["crawl_runs"], consumers: ["Crawl History"], notes: "Paginated crawl run list." },
+      { path: "/api/crawl-live", methods: ["GET", "POST"], tables: ["crawl_runs", "listings", "crawl_errors", "sellers"], consumers: ["Crawl Run Detail"], notes: "GET returns live run slices; POST marks a running crawl cancelled." },
+      { path: "/api/favorites", methods: ["GET", "POST"], tables: ["favorites", "listings", "pipeline_items"], consumers: ["Favorites", "ListingCard", "ListingDetail"], notes: "List current user's favorites or add a listing." },
+      { path: "/api/favorites/[adId]", methods: ["DELETE"], tables: ["favorites"], consumers: ["ListingCard", "ListingDetail"], notes: "Removes one user's favorite row." },
+      { path: "/api/pipeline", methods: ["GET", "POST"], tables: ["pipeline_items", "listings"], consumers: ["Pipeline", "ListingDetail"], notes: "Returns board items or inserts a tracked listing." },
+      { path: "/api/pipeline/[adId]", methods: ["PATCH", "DELETE"], tables: ["pipeline_items"], consumers: ["Pipeline", "ListingDetail"], notes: "Move stage/position or remove from pipeline." },
+      { path: "/api/saved-searches", methods: ["GET", "POST"], tables: ["saved_searches"], consumers: ["Saved Searches", "SaveSearchModal"], notes: "List or create named filter snapshots." },
+      { path: "/api/saved-searches/[id]", methods: ["PATCH", "DELETE"], tables: ["saved_searches"], consumers: ["Saved Searches"], notes: "Update or delete one user-scoped saved search." },
+      { path: "/api/saved-searches/check-all", methods: ["POST"], tables: ["saved_searches", "listings", "favorites", "pipeline_items"], consumers: ["Saved Searches"], notes: "Recounts new matches since lastCheckedAt and updates saved_searches." },
+      { path: "/api/notifications/daily-summary", methods: ["GET", "POST"], tables: ["notification_digest_runs", "notification_digest_items", "saved_searches", "listings"], consumers: ["Notifications page"], notes: "GET latest digest; POST captures an ad hoc digest for daily or weekly cadence." },
+      { path: "/api/notifications/recipients", methods: ["GET", "POST"], tables: ["notification_recipients"], consumers: ["WhatsApp recipients panel"], notes: "Lists recipients and Evo configuration state; creates or upserts one recipient." },
+      { path: "/api/notifications/recipients/[id]", methods: ["PATCH", "DELETE"], tables: ["notification_recipients"], consumers: ["WhatsApp recipients panel"], notes: "Patch settings or soft-delete a recipient by setting active false." },
+      { path: "/api/cron/notifications/daily", methods: ["GET:CRON"], tables: ["notification_*", "saved_searches", "listings"], consumers: ["Vercel cron or external scheduler"], notes: "Requires CRON_SECRET bearer token; sends daily WhatsApp digests." },
+      { path: "/api/cron/notifications/weekly", methods: ["GET:CRON"], tables: ["notification_*", "saved_searches", "listings"], consumers: ["Vercel cron or external scheduler"], notes: "Requires CRON_SECRET bearer token; sends weekly WhatsApp digests." }
+    ];
+
+    const codeAreas = [
+      {
+        title: "Root Runtime",
+        summary: "CLI, actor, crawler, extractors, schema, DB connection, seller/contact tooling, and P.H. detection tooling.",
+        files: ["src/index.ts", "src/actor/encuentra24.ts", "src/crawler/index.ts", "src/crawler/router.ts", "src/crawler/extractors/*", "src/cli/commands/*", "src/ph/detector.ts", "src/db/schema.ts"]
+      },
+      {
+        title: "Web Runtime",
+        summary: "Next.js App Router dashboard, API routes, React Query client pages, Stack auth, DB helpers, notifications, maps, and charts.",
+        files: ["web/src/app/(app)/*", "web/src/app/api/*", "web/src/components/*", "web/src/db/query-builder.ts", "web/src/lib/notifications/*", "web/src/types/filters.ts", "web/src/db/schema.ts"]
+      },
+      {
+        title: "Database Definition",
+        summary: "Drizzle schema is duplicated across root and web. Generated Drizzle SQL plus manual migrations extend indexes and notification tables.",
+        files: ["src/db/schema.ts", "web/src/db/schema.ts", "drizzle/0000_wooden_moon_knight.sql", "drizzle/0001_aberrant_mentor.sql", "migrations/*.sql"]
+      },
+      {
+        title: "Crawler Categories",
+        summary: "A static set of sale, rental, vacation, and new_project slugs drives crawl fanout and URL validation.",
+        files: ["src/crawler/categories.ts", "src/crawler/utils/url.ts", "src/crawler/utils/url.test.ts"]
+      },
+      {
+        title: "User Workspace",
+        summary: "Favorites, pipeline, notes, and saved searches are userId-scoped rows layered over crawler-owned listings.",
+        files: ["web/src/app/(app)/favorites/page.tsx", "web/src/app/(app)/pipeline/page.tsx", "web/src/app/(app)/saved-searches/page.tsx", "web/src/app/api/favorites/*", "web/src/app/api/pipeline/*", "web/src/app/api/saved-searches/*"]
+      },
+      {
+        title: "Market Intelligence",
+        summary: "Dashboard and agent reports use raw SQL aggregations against listings for category, city, pricing, seller, and quality metrics.",
+        files: ["web/src/app/api/dashboard/route.ts", "web/src/app/api/dashboard/trends/route.ts", "web/src/app/api/agents/route.ts", "web/src/app/api/agents/[name]/route.ts", "web/src/components/agents/*"]
+      },
+      {
+        title: "Crawl Monitoring",
+        summary: "Crawl history and live detail pages interpret crawl_runs, crawl_errors, and time windows over listings.",
+        files: ["web/src/app/api/crawl-history/route.ts", "web/src/app/api/crawl-live/route.ts", "web/src/components/crawl-history/*"]
+      },
+      {
+        title: "Notifications",
+        summary: "Saved-search match capture, digest grouping, WhatsApp recipient settings, Evo API sending, and delivery tracking.",
+        files: ["web/src/lib/notifications/daily-summary.ts", "web/src/lib/notifications/scheduler.ts", "web/src/lib/notifications/recipients.ts", "web/src/lib/notifications/evo.ts", "web/src/app/api/notifications/*", "web/src/app/api/cron/notifications/*"]
+      },
+      {
+        title: "Operational Docs",
+        summary: "Production safety, Vercel and Coolify inventory, Crawlee Cloud notes, and service/DNS records live in docs and AGENTS.md.",
+        files: ["AGENTS.md", "docs/crawlee-cloud.md", "docs/inventory/services.md", "docs/inventory/dns-changes.md"]
+      }
+    ];
+
+    const risks = [
+      { type: "warn", title: "Duplicated schema files", body: "The root crawler and web app each have a Drizzle schema copy. Any table or column change must update both src/db/schema.ts and web/src/db/schema.ts before migrations are trusted." },
+      { type: "warn", title: "Logical relationships without foreign keys", body: "ad_id, crawl_run_id, digest_run_id, recipient_id, and source_id are related by convention and indexes, not explicit references. Query changes need extra care around orphaned rows and deletes." },
+      { type: "warn", title: "Dates stored as text", body: "Most timestamps and dates are text. Many queries rely on ISO ordering or cast text to timestamp. Keep formats consistent when writing new data." },
+      { type: "warn", title: "Heavy raw SQL routes", body: "Dashboard, trends, agent, categories, and crawl-live routes use raw aggregation SQL. Review execution shape before changing filters, joins, or limits." },
+      { type: "warn", title: "Crawler owns core market state", body: "The crawler updates listings directly, including removedAt and detailCrawled. Do not test crawler changes against production unless explicitly asked." },
+      { type: "warn", title: "Saved search filters are JSON text", body: "saved_searches.filters must round-trip through ListingFilters. Adding or renaming filter fields means updating parser, query-builder, UI, dashboard previews, check-all, and notifications." },
+      { type: "good", title: "Server-side filtering and pagination", body: "The listing API keeps filter, sort, count, and pagination work in SQL instead of fetching broad data into the client." },
+      { type: "good", title: "Full-crawl removal safety check", body: "Unseen active listings are only marked removed after a full, unscoped crawl and a sanity check that enough active listings were seen." },
+      { type: "good", title: "Notification idempotency", body: "Digest runs and items use unique indexes around schedule keys and listing events, reducing duplicate sends during retries." },
+      { type: "good", title: "Production/stage separation documented", body: "AGENTS.md records branch mapping, Vercel project details, and separate production, stage, and Crawlee migration databases." }
+    ];
+
+    const navButtons = document.querySelectorAll(".nav button[data-section]");
+    const sections = document.querySelectorAll(".section");
+
+    navButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const sectionId = button.dataset.section;
+        navButtons.forEach((b) => b.classList.toggle("active", b === button));
+        sections.forEach((section) => section.classList.toggle("active", section.id === sectionId));
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      });
+    });
+
+    function pill(text, hot = false) {
+      const span = document.createElement("span");
+      span.className = hot ? "chip hot" : "chip";
+      span.textContent = text;
+      return span;
+    }
+
+    function renderNodes() {
+      const grid = document.getElementById("nodeGrid");
+      grid.innerHTML = "";
+      systemNodes.forEach((node, index) => {
+        const button = document.createElement("button");
+        button.className = "node";
+        button.dataset.node = node.id;
+        button.innerHTML = `
+          <span class="kind">${node.kind}</span>
+          <h4>${node.label}</h4>
+          <p>${node.role}</p>
+        `;
+        button.addEventListener("click", () => selectNode(node.id));
+        grid.appendChild(button);
+        if (index === 0) button.classList.add("active");
+      });
+      renderNodeDetail(systemNodes[0]);
+    }
+
+    function selectNode(nodeId) {
+      const node = systemNodes.find((item) => item.id === nodeId);
+      document.querySelectorAll(".node").forEach((button) => button.classList.toggle("active", button.dataset.node === nodeId));
+      renderNodeDetail(node);
+    }
+
+    function renderNodeDetail(node) {
+      const detail = document.getElementById("nodeDetail");
+      detail.innerHTML = `
+        <div class="panel-body">
+          <span class="chip hot">${node.kind}</span>
+          <h3>${node.label}</h3>
+          <p>${node.role}</p>
+          <div class="kv">
+            <div><span>Owner</span><span>${node.owner}</span></div>
+            <div><span>Reads</span><span>${node.reads.length ? node.reads.join(", ") : "External input"}</span></div>
+            <div><span>Writes</span><span>${node.writes.length ? node.writes.join(", ") : "None directly"}</span></div>
+          </div>
+          <h4>Files</h4>
+          <div class="chips" id="nodeFiles"></div>
+          <h4>Notes</h4>
+          <div class="chips" id="nodeNotes"></div>
+        </div>
+      `;
+      const files = detail.querySelector("#nodeFiles");
+      node.files.forEach((file) => files.appendChild(pill(file)));
+      const notes = detail.querySelector("#nodeNotes");
+      node.notes.forEach((note) => notes.appendChild(pill(note, true)));
+    }
+
+    function renderFlows(activeId = "crawl") {
+      const tabs = document.getElementById("flowTabs");
+      tabs.innerHTML = "";
+      Object.entries(flows).forEach(([id, flow]) => {
+        const button = document.createElement("button");
+        button.className = id === activeId ? "segmented active" : "segmented";
+        button.textContent = flow.label;
+        button.addEventListener("click", () => renderFlows(id));
+        tabs.appendChild(button);
+      });
+
+      const flow = flows[activeId];
+      const steps = document.getElementById("flowSteps");
+      steps.innerHTML = "";
+      flow.steps.forEach((step, index) => {
+        const article = document.createElement("article");
+        article.className = "step";
+        article.innerHTML = `
+          <div class="step-number">${index + 1}</div>
+          <div>
+            <h4>${step[0]}</h4>
+            <p>${step[1]}</p>
+            <div class="chips"></div>
+          </div>
+        `;
+        const chips = article.querySelector(".chips");
+        step[2].forEach((item) => chips.appendChild(pill(item)));
+        steps.appendChild(article);
+      });
+      document.getElementById("flowCallout").innerHTML = flow.callout;
+    }
+
+    let activeSchemaGroup = "all";
+    let activeTable = "listings";
+
+    function getColumnCount(schema) {
+      return Object.values(schema.fields).reduce((sum, group) => sum + group.length, 0);
+    }
+
+    function schemaMatches(schema, query) {
+      if (!query) return true;
+      const blob = [
+        schema.table,
+        schema.group,
+        schema.owner,
+        schema.purpose,
+        schema.mutation,
+        schema.indexes.join(" "),
+        schema.related.join(" "),
+        ...Object.values(schema.fields).flat().flat()
+      ].join(" ").toLowerCase();
+      return blob.includes(query.toLowerCase());
+    }
+
+    function renderSchemaFilters() {
+      const filters = document.getElementById("schemaFilters");
+      filters.innerHTML = "";
+      [
+        ["all", "All"],
+        ["crawler", "Crawler"],
+        ["user", "User"],
+        ["notifications", "Notifications"]
+      ].forEach(([id, label]) => {
+        const button = document.createElement("button");
+        button.className = id === activeSchemaGroup ? "segmented active" : "segmented";
+        button.textContent = label;
+        button.addEventListener("click", () => {
+          activeSchemaGroup = id;
+          renderSchema();
+        });
+        filters.appendChild(button);
+      });
+    }
+
+    function renderSchema() {
+      renderSchemaFilters();
+      const query = document.getElementById("schemaSearch").value.trim();
+      const list = document.getElementById("tableList");
+      const filtered = schemas.filter((schema) => {
+        const groupOk = activeSchemaGroup === "all" || schema.group === activeSchemaGroup;
+        return groupOk && schemaMatches(schema, query);
+      });
+
+      if (!filtered.find((schema) => schema.table === activeTable) && filtered.length > 0) {
+        activeTable = filtered[0].table;
+      }
+
+      list.innerHTML = "";
+      if (filtered.length === 0) {
+        list.innerHTML = '<div class="empty-state">No matching tables.</div>';
+        renderSchemaDetail(null);
+        return;
+      }
+
+      filtered.forEach((schema) => {
+        const button = document.createElement("button");
+        button.className = schema.table === activeTable ? "table-row active" : "table-row";
+        button.innerHTML = `
+          <strong>${schema.table}</strong>
+          <span>${schema.group} / ${getColumnCount(schema)} columns / ${schema.indexes.length} indexes</span>
+          <span>${schema.purpose}</span>
+        `;
+        button.addEventListener("click", () => {
+          activeTable = schema.table;
+          renderSchema();
+        });
+        list.appendChild(button);
+      });
+
+      renderSchemaDetail(schemas.find((schema) => schema.table === activeTable));
+    }
+
+    function renderSchemaDetail(schema) {
+      const detail = document.getElementById("schemaDetail");
+      if (!schema) {
+        detail.innerHTML = '<div class="empty-state">Select a table.</div>';
+        return;
+      }
+
+      detail.innerHTML = `
+        <div class="panel">
+          <div class="panel-body">
+            <div class="chips"><span class="chip hot">${schema.group}</span><span class="chip">${schema.owner}</span></div>
+            <h3>${schema.table}</h3>
+            <p>${schema.purpose}</p>
+            <div class="schema-summary">
+              <div class="mini-stat"><b>${getColumnCount(schema)}</b><span>columns</span></div>
+              <div class="mini-stat"><b>${schema.indexes.length}</b><span>indexes</span></div>
+              <div class="mini-stat"><b>${schema.related.length}</b><span>logical links</span></div>
+            </div>
+            <div class="callout"><strong>Mutation:</strong> ${schema.mutation}</div>
+            <h4>Columns</h4>
+            <div class="field-groups" id="fieldGroups"></div>
+            <h4>Indexes</h4>
+            <div class="index-list" id="indexList"></div>
+            <h4>Logical Relationships</h4>
+            <div class="chips" id="relatedList"></div>
+          </div>
+        </div>
+      `;
+
+      const groups = detail.querySelector("#fieldGroups");
+      Object.entries(schema.fields).forEach(([name, fields]) => {
+        const section = document.createElement("section");
+        section.className = "field-group";
+        section.innerHTML = `<h4>${name}</h4>`;
+        fields.forEach(([column, type, note]) => {
+          const row = document.createElement("div");
+          row.className = "field";
+          row.innerHTML = `<code>${column}</code><code>${type}</code><span>${note || ""}</span>`;
+          section.appendChild(row);
+        });
+        groups.appendChild(section);
+      });
+
+      const indexList = detail.querySelector("#indexList");
+      if (schema.indexes.length === 0) {
+        indexList.innerHTML = '<div class="index-item">No explicit index declared in schema.</div>';
+      } else {
+        schema.indexes.forEach((index) => {
+          const item = document.createElement("div");
+          item.className = "index-item code";
+          item.textContent = index;
+          indexList.appendChild(item);
+        });
+      }
+
+      const related = detail.querySelector("#relatedList");
+      schema.related.forEach((item) => related.appendChild(pill(item)));
+    }
+
+    function renderApiFilters() {
+      const select = document.getElementById("apiTableFilter");
+      const tables = Array.from(new Set(apiRoutes.flatMap((route) => route.tables))).sort();
+      tables.forEach((table) => {
+        const option = document.createElement("option");
+        option.value = table;
+        option.textContent = table;
+        select.appendChild(option);
+      });
+    }
+
+    function renderApis() {
+      const query = document.getElementById("apiSearch").value.trim().toLowerCase();
+      const table = document.getElementById("apiTableFilter").value;
+      const grid = document.getElementById("apiGrid");
+      const filtered = apiRoutes.filter((route) => {
+        const tableOk = !table || route.tables.includes(table) || (table === "notification_*" && route.tables.some((item) => item.startsWith("notification_")));
+        const blob = [route.path, route.methods.join(" "), route.tables.join(" "), route.consumers.join(" "), route.notes].join(" ").toLowerCase();
+        return tableOk && (!query || blob.includes(query));
+      });
+
+      grid.innerHTML = "";
+      if (filtered.length === 0) {
+        grid.innerHTML = '<div class="empty-state">No matching routes.</div>';
+        return;
+      }
+
+      filtered.forEach((route) => {
+        const card = document.createElement("article");
+        card.className = "route-card";
+        card.innerHTML = `
+          <div class="method-list"></div>
+          <h4 class="code">${route.path}</h4>
+          <p>${route.notes}</p>
+          <div><strong>Consumers</strong><div class="chips consumers"></div></div>
+          <div><strong>Tables</strong><div class="chips tables"></div></div>
+        `;
+        const methods = card.querySelector(".method-list");
+        route.methods.forEach((method) => {
+          const span = document.createElement("span");
+          span.className = method.includes("POST") || method.includes("PATCH") || method.includes("DELETE") ? "method write" : method.includes("CRON") ? "method cron" : "method";
+          span.textContent = method;
+          methods.appendChild(span);
+        });
+        const consumers = card.querySelector(".consumers");
+        route.consumers.forEach((item) => consumers.appendChild(pill(item)));
+        const tables = card.querySelector(".tables");
+        route.tables.forEach((item) => tables.appendChild(pill(item, item.startsWith("notification_"))));
+        grid.appendChild(card);
+      });
+    }
+
+    function renderCodeMap() {
+      const grid = document.getElementById("codeMap");
+      grid.innerHTML = "";
+      codeAreas.forEach((area) => {
+        const card = document.createElement("article");
+        card.className = "map-item";
+        card.innerHTML = `
+          <h4>${area.title}</h4>
+          <p>${area.summary}</p>
+          <div class="file-list"></div>
+        `;
+        const files = card.querySelector(".file-list");
+        area.files.forEach((file) => {
+          const code = document.createElement("code");
+          code.textContent = file;
+          files.appendChild(code);
+        });
+        grid.appendChild(card);
+      });
+    }
+
+    function renderRisks() {
+      const grid = document.getElementById("riskGrid");
+      grid.innerHTML = "";
+      risks.forEach((risk) => {
+        const item = document.createElement("article");
+        item.className = `risk-item ${risk.type}`;
+        item.innerHTML = `<h4>${risk.title}</h4><p>${risk.body}</p>`;
+        grid.appendChild(item);
+      });
+    }
+
+    document.getElementById("schemaSearch").addEventListener("input", renderSchema);
+    document.getElementById("apiSearch").addEventListener("input", renderApis);
+    document.getElementById("apiTableFilter").addEventListener("change", renderApis);
+
+    renderNodes();
+    renderFlows();
+    renderSchema();
+    renderApiFilters();
+    renderApis();
+    renderCodeMap();
+    renderRisks();
+  </script>
+</body>
+</html>

@@ -3,7 +3,18 @@ import { sql } from 'drizzle-orm';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, extname } from 'node:path';
 import { closeDb, getDb, initDb } from '../../db/connection.js';
-import { detectPhMentions, loadPhCatalog, normalizePhName, type PhDetection, type PhMatchStatus } from '../../ph/detector.js';
+import {
+  detectPhMentions,
+  extractPhCandidates,
+  loadPhCatalog,
+  matchPhCandidate,
+  normalizePhName,
+  type PhCatalog,
+  type PhDetection,
+  type PhMatchOptions,
+  type PhMatchResult,
+  type PhMatchStatus,
+} from '../../ph/detector.js';
 
 interface ListingRow {
   adId: string;
@@ -192,12 +203,14 @@ async function analyzePhListings(options: {
     const listingsWithCandidate = new Set<string>();
     const listingsWithExplicitPh = new Set<string>();
     const listingsWithLooseBuildingMarker = new Set<string>();
+    const matchCache = new Map<string, PhMatchResult>();
 
     for (const row of rows) {
-      const rowDetections = detectPhMentions(
+      const rowDetections = detectWithMatchCache(
         { title: row.title, description: row.description },
         catalog,
         { minScore: options.minScore, reviewScore: options.reviewScore },
+        matchCache,
       );
 
       if (rowDetections.length > 0) {
@@ -226,6 +239,7 @@ async function analyzePhListings(options: {
       listingsWithLooseBuildingMarker: listingsWithLooseBuildingMarker.size,
       looseBuildingMarkerRate: ratio(listingsWithLooseBuildingMarker.size, totalRow?.count ?? 0),
       detections: detections.length,
+      uniqueCandidates: matchCache.size,
       detectionsByPattern: countBy(detections, (item) => item.pattern),
       matchedDetections: detections.filter((item) => item.status === 'matched').length,
       reviewDetections: detections.filter((item) => item.status === 'review').length,
@@ -259,6 +273,24 @@ async function analyzePhListings(options: {
   } finally {
     await closeDb();
   }
+}
+
+function detectWithMatchCache(
+  input: { title?: string | null; description?: string | null },
+  catalog: PhCatalog,
+  options: PhMatchOptions,
+  matchCache: Map<string, PhMatchResult>,
+): PhDetection[] {
+  return extractPhCandidates(input).map((mention) => {
+    const cached = matchCache.get(mention.normalized);
+    if (cached) {
+      return { mention, match: cached };
+    }
+
+    const match = matchPhCandidate(mention, catalog, options);
+    matchCache.set(mention.normalized, match);
+    return { mention, match };
+  });
 }
 
 function validateAnalyzeOptions(options: { status: string; scan: string; format?: string; limit?: number }) {
@@ -477,6 +509,7 @@ function printSummary(summary: Record<string, unknown>, groups: CandidateGroup[]
   console.log(`  Explicit P.H. marker: ${summary.listingsWithExplicitPh} (${summary.explicitPhMentionRate})`);
   console.log(`  Loose building marker only: ${summary.listingsWithLooseBuildingMarker} (${summary.looseBuildingMarkerRate})`);
   console.log(`Detections: ${summary.detections}`);
+  console.log(`Unique candidates: ${summary.uniqueCandidates}`);
   console.log(`  Matched: ${summary.matchedDetections}`);
   console.log(`  Review: ${summary.reviewDetections}`);
   console.log(`  Unmatched: ${summary.unmatchedDetections}`);

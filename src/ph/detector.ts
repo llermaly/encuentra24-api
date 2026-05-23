@@ -123,9 +123,14 @@ const GENERIC_NAME_WORDS = new Set([
   'esta',
   'excelente',
   'exclusivo',
+  'exclusiva',
   'completa',
   'completas',
+  'familiar',
+  'gimnasio',
   'hermoso',
+  'infantil',
+  'lobby',
   'lujo',
   'lujoso',
   'moderno',
@@ -135,6 +140,7 @@ const GENERIC_NAME_WORDS = new Set([
   'oportunidad',
   'piso',
   'piscina',
+  'planta',
   'privado',
   'remodelado',
   'seguridad',
@@ -155,8 +161,9 @@ const STOP_AFTER_PATTERN = new RegExp(
   [
     '\\b(?:alquilo|alquiler|amoblado|amoblada|apartamento|apto|area|bañ',
     'os?|cerca|con|cuenta|disponible|en\\s+el\\s+area|en\\s+la\\s+zona|',
-    'frente|full|linea\\s+blanca|metros?|m2|para|piso|precio|recamaras?|',
-    'se\\s+alquila|se\\s+vende|ubicad[oa]|venta|vendo|vista)\\b',
+    'frente|full|gimnasio|linea\\s+blanca|lobby|metros?|m2|para|parque\\s+infantil|',
+    'piso|planta\\s+electrica|precio|recamaras?|se\\s+alquila|se\\s+vende|',
+    'seguridad|ubicad[oa]|venta|vendo|vista)\\b',
   ].join(''),
   'iu',
 );
@@ -291,9 +298,9 @@ export function loadPhCatalog(paths: PhCatalogPaths = {}): PhCatalog {
   const entries = loadRegistry(paths.registryPath);
   const aliases = loadAliases(paths.aliasesPath);
   const ignoredNormalized = loadIgnored(paths.ignorePath);
-  const activeEntries = entries.filter((entry) => entry.active);
+  const activeEntries = entries.filter((entry) => entry.active && entry.normalizedName);
   const entryIds = new Set(activeEntries.map((entry) => entry.canonicalId));
-  const targets: MatchTarget[] = [
+  const rawTargets: MatchTarget[] = [
     ...activeEntries.map((entry) => ({
       canonicalId: entry.canonicalId,
       displayName: entry.canonicalName,
@@ -312,6 +319,9 @@ export function loadPhCatalog(paths: PhCatalogPaths = {}): PhCatalog {
         };
       }),
   ];
+  const targets = Array.from(
+    new Map(rawTargets.map((target) => [`${target.canonicalId}|${target.normalized}|${target.targetType}`, target])).values(),
+  );
 
   return { entries: activeEntries, aliases, ignoredNormalized, targets };
 }
@@ -343,7 +353,7 @@ function extractFromText(text: string, source: 'title' | 'description'): PhMenti
 function extractTrailingPhFromTitle(title: string): PhMentionCandidate[] {
   const candidates: PhMentionCandidate[] = [];
   const compact = title.replace(/\s+/g, ' ');
-  const pattern = new RegExp(String.raw`([${NAME_CHARS}]{3,70})\s+\b${PH_MARKER}\b`, 'giu');
+  const pattern = new RegExp(String.raw`([${NAME_CHARS}]{3,70})\s+\b${PH_MARKER}\b(?=\s*(?:$|[),.;:-]))`, 'giu');
 
   for (const match of compact.matchAll(pattern)) {
     const raw = cleanCapturedName(match[1] ?? '', { fromLeft: true });
@@ -368,7 +378,7 @@ function cleanCapturedName(value: string, options: { fromLeft?: boolean } = {}):
     .replace(/[\s:;,.#\-–—/]+$/, '')
     .trim();
 
-  if (START_FALSE_PATTERN.test(cleaned)) {
+  if (!options.fromLeft && START_FALSE_PATTERN.test(cleaned)) {
     return '';
   }
 
@@ -584,20 +594,44 @@ function registryEntryFromRecord(
   row: Partial<PhRegistryEntry> & Record<string, string | boolean | undefined> & { name?: string },
   index: number,
 ): PhRegistryEntry | null {
-  const canonicalName = String(row.canonicalName ?? row.canonical_name ?? row.name ?? '').trim();
+  const canonicalName = cleanRegistryName(String(row.canonicalName ?? row.canonical_name ?? row.name ?? ''));
   if (!canonicalName) return null;
 
   const activeValue = row.active;
   const active = activeValue === undefined || activeValue === true || String(activeValue).toLowerCase() !== 'false';
+  const notes = typeof row.notes === 'string' && row.notes.trim()
+    ? row.notes.trim()
+    : registryNotesFromRow(row);
 
   return {
     canonicalId: String(row.canonicalId ?? row.canonical_id ?? stableId(canonicalName, index)).trim(),
     canonicalName,
     normalizedName: normalizePhName(canonicalName),
-    source: typeof row.source === 'string' ? row.source.trim() || undefined : undefined,
+    source: typeof row.source === 'string' ? row.source.trim() || undefined : registrySourceFromRow(row),
     active,
-    notes: typeof row.notes === 'string' ? row.notes.trim() || undefined : undefined,
+    notes,
   };
+}
+
+function cleanRegistryName(value: string): string {
+  return value
+    .replace(/[\u0000-\u001F\u007F]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function registrySourceFromRow(row: Record<string, string | boolean | undefined>): string | undefined {
+  if (row.codigoUbicacion || row.municipio) return 'registro_publico';
+  return undefined;
+}
+
+function registryNotesFromRow(row: Record<string, string | boolean | undefined>): string | undefined {
+  const notes = [
+    row.codigoUbicacion ? `codigoUbicacion=${row.codigoUbicacion}` : '',
+    row.municipio ? `municipio=${row.municipio}` : '',
+  ].filter(Boolean);
+
+  return notes.length > 0 ? notes.join('; ') : undefined;
 }
 
 function stableId(name: string, index: number): string {
@@ -613,18 +647,51 @@ function parseCsv(raw: string): Record<string, string>[] {
 
   if (lines.length === 0) return [];
 
-  const header = parseCsvLine(lines[0]).map((column) => column.trim());
+  const delimiter = detectCsvDelimiter(lines[0]);
+  const header = parseCsvLine(lines[0], delimiter).map((column) => column.trim());
   const hasHeader = header.some((column) => ['canonical_id', 'canonical_name', 'canonicalId', 'canonicalName', 'name', 'alias'].includes(column));
   const columns = hasHeader ? header : ['canonical_name'];
   const dataLines = hasHeader ? lines.slice(1) : lines;
 
   return dataLines.map((line) => {
-    const values = parseCsvLine(line);
+    const values = parseCsvLine(line, delimiter);
     return Object.fromEntries(columns.map((column, index) => [column, values[index] ?? '']));
   });
 }
 
-function parseCsvLine(line: string): string[] {
+function detectCsvDelimiter(headerLine: string): ',' | ';' {
+  const semicolons = countUnquoted(headerLine, ';');
+  const commas = countUnquoted(headerLine, ',');
+  return semicolons > commas ? ';' : ',';
+}
+
+function countUnquoted(line: string, delimiter: ',' | ';'): number {
+  let count = 0;
+  let quoted = false;
+
+  for (let index = 0; index < line.length; index++) {
+    const char = line[index];
+    const next = line[index + 1];
+
+    if (char === '"' && quoted && next === '"') {
+      index++;
+      continue;
+    }
+
+    if (char === '"') {
+      quoted = !quoted;
+      continue;
+    }
+
+    if (char === delimiter && !quoted) {
+      count++;
+    }
+  }
+
+  return count;
+}
+
+function parseCsvLine(line: string, delimiter: ',' | ';'): string[] {
   const values: string[] = [];
   let current = '';
   let quoted = false;
@@ -644,7 +711,7 @@ function parseCsvLine(line: string): string[] {
       continue;
     }
 
-    if (char === ',' && !quoted) {
+    if (char === delimiter && !quoted) {
       values.push(current.trim());
       current = '';
       continue;
